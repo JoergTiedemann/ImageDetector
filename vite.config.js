@@ -10,9 +10,9 @@ export default defineConfig({
       },
     }),
   ],
+  assetsInclude: ["**/*.wasm"],
   server: {
   open: true
   }
 
 })
-

@@ -7,6 +7,14 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
+# Yolo Modelle
+## Trainieren
+yolo detect train data=c:\Users\joerg\Documents\Git\ImageDetector\home\data.yaml model=yolov8n.pt epochs=50 imgsz=640 batch=8
+
+## Exportieren
+yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
+
+
 
 ## React Compiler
 

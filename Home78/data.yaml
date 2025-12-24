@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['ripe-blueberries', 'semi-ripe-blueberries']
+
+roboflow:
+  workspace: blaubeeren
+  project: blueberry-2wgpq-e1f5t
+  version: 1
+  license: Private
+  url: https://universe.roboflow.com/blaubeeren/blueberry-2wgpq-e1f5t/dataset/1
