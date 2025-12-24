@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
+//  base: "/yolo-object-detection-onnxruntime-web/",
+
 export default defineConfig({
   plugins: [
     react({
@@ -19,7 +21,8 @@ export default defineConfig({
   server: {
   open: true
   },
-  base: "/yolo-object-detection-onnxruntime-web/",
+  base: '/',   // statt '/yolo-object-detection-onnxruntime-web/'
+  build: { outDir: 'dist' }
 
 })
 
