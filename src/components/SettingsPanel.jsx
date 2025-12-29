@@ -58,7 +58,7 @@ const SettingsPanel = memo(function SettingsPanel({
           {/* --- Verfahren & Modell --- */}
           <div className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* <div className="flex flex-col">
+              <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
                   Verfahren:
                 </label>
@@ -75,7 +75,7 @@ const SettingsPanel = memo(function SettingsPanel({
                   <option value="wasm">CPU</option>
                   <option value="webgpu">Grafikprozessor</option>
                 </select>
-              </div> */}
+              </div>
 
               <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
