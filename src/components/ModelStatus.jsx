@@ -9,13 +9,13 @@ const ModelStatus = memo(function ModelStatus({
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <h2 className="text-lg sm:text-xl font-bold mb-3 text-gray-200 border-b border-gray-700 pb-2">
-        Model Performance
+        Modell Geschwindigkeit
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div className="bg-gray-700 p-3 rounded-lg">
           <div className="text-gray-400 text-xs sm:text-sm font-medium mb-1">
-            Warm Up Time
+            Aufwärmzeit
           </div>
           <div className="text-xl sm:text-2xl font-bold text-lime-500">
             {warnUpTime} ms
@@ -24,7 +24,7 @@ const ModelStatus = memo(function ModelStatus({
 
         <div className="bg-gray-700 p-3 rounded-lg">
           <div className="text-gray-400 text-xs sm:text-sm font-medium mb-1">
-            Inference Time
+            Erkennungszeit
           </div>
           <div className="text-xl sm:text-2xl font-bold text-lime-500">
             {inferenceTime} ms

@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import berry  from "../utils/berry_classes.json";
 
 const SettingsPanel = memo(function SettingsPanel({
   backendSelectorRef,
@@ -20,14 +21,14 @@ const SettingsPanel = memo(function SettingsPanel({
       className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6 overflow-hidden"
     >
       <h2 className="text-lg sm:text-xl font-bold mb-3 text-gray-200 border-b border-gray-700 pb-2">
-        Model Settings
+        Einstellungen
       </h2>
 
       <div className="mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="flex flex-col">
             <label className="text-gray-300 mb-1 text-sm font-medium">
-              Backend:
+              Verfahren:
             </label>
             <select
               name="device-selector"
@@ -39,14 +40,14 @@ const SettingsPanel = memo(function SettingsPanel({
               disabled={activeFeature !== null}
               className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
             >
-              <option value="wasm">Wasm (CPU)</option>
-              <option value="webgpu">WebGPU</option>
+              <option value="wasm">CPU</option>
+              <option value="webgpu">Grafikprozessor</option>
             </select>
           </div>
 
           <div className="flex flex-col">
             <label className="text-gray-300 mb-1 text-sm font-medium">
-              Model:
+              KI-Modell:
             </label>
             <select
               name="model-selector"
@@ -58,14 +59,13 @@ const SettingsPanel = memo(function SettingsPanel({
               disabled={activeFeature !== null}
               className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
             >
+              <option value="berry2k_100">Blaubeeren (2Tsd Bilder,100 Epochen,12MB)</option>
+              <option value="berry2k_50">Blaubeeren (2Tsd Bilder,50 Epochen,12MB)</option>
+              <option value="best78">Blaubeeren (78 Bilder,12MB)</option>
+              <option value="berry9k_Epoch8">Blaubeeren (9Tsd Bilder,8 Epochen,18MB)</option>
               <option value="yolo11n">YOLO11n (2.6M)</option>
               <option value="yolo11s">YOLO11s (9.4M)</option>
-              <option value="yolo11s">YOLO11m (20.1M)</option>
               <option value="yolo12n">YOLO12n (2.6M)</option>
-              <option value="yolo12s">YOLO12s (9.3M)</option>
-              <option value="best">Berry best</option>
-              <option value="best78">Berry 78</option>
-              <option value="berry2">Berry2</option>
               {customModels.map((model, index) => (
                 <option key={index} value={model.url}>
                   {model.name}
@@ -80,7 +80,7 @@ const SettingsPanel = memo(function SettingsPanel({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="flex flex-col">
             <label className="text-gray-300 mb-1 text-sm font-medium">
-              Classes:
+              Klassen:
             </label>
             <select
               ref={classFileSelectedRef}
@@ -88,16 +88,27 @@ const SettingsPanel = memo(function SettingsPanel({
               disabled={activeFeature !== null}
               onChange={(e) => {
                 if (e.target.value === "default") {
+                  // console.log("Klasse:",defaultClasses)
                   modelConfigRef.current.classes = defaultClasses;
                 } else {
+                  if (e.target.value === "berry") {
+                  // console.log("BerryKlasse:",berry)
+                    modelConfigRef.current.classes = { classes: [...berry.berry] };
+                      // modelConfigRef.current.classes = { classes: berry };
+
+                   } else {
                   const selectedIndex = parseInt(e.target.value);
                   modelConfigRef.current.classes =
                     customClasses[selectedIndex].data;
                 }
-              }}
+              }
+                  console.log("modelConfigRef.current.classes:",modelConfigRef.current.classes)
+
+            }}
               className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
             >
               <option value="default">Default Classes (COCO)</option>
+              <option value="berry">Blaubeeren</option>
               {customClasses.map((classFile, index) => (
                 <option key={index} value={index}>
                   {classFile.name}
@@ -108,7 +119,7 @@ const SettingsPanel = memo(function SettingsPanel({
 
           <div className="flex flex-col">
             <label className="text-gray-300 mb-1 text-sm font-medium">
-              Camera:
+              Kamera:
             </label>
             <select
               ref={cameraSelectorRef}
@@ -129,7 +140,7 @@ const SettingsPanel = memo(function SettingsPanel({
 
           <div className="flex flex-col">
             <label className="text-gray-300 mb-1 text-sm font-medium">
-              Image Type:
+              Bildtyp:
             </label>
             <select
               disabled={activeFeature !== null}
@@ -139,8 +150,8 @@ const SettingsPanel = memo(function SettingsPanel({
               }}
               className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
             >
-              <option value="dynamic">Dynamic</option>
               <option value="zeroPad">Zero Pad</option>
+              <option value="dynamic">Dynamic</option>
             </select>
           </div>
         </div>

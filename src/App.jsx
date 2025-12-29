@@ -4,6 +4,7 @@ import { model_loader } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay } from "./utils/render_overlay";
 import classes from "./utils/yolo_classes.json";
+import berry  from "./utils/berry_classes.json";
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -12,15 +13,16 @@ import ControlButtons from "./components/ControlButtons";
 import ModelStatus from "./components/ModelStatus";
 import ResultsTable from "./components/ResultsTable";
 
+// hier die Initialwerte besetzen
 const MODEL_CONFIG = {
   input_shape: [1, 3, 640, 640],
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "wasm",
-  model: "yolo11n",
+  model: "berry2k_50",
   model_path: "",
   task: "detect",
-  imgsz_type: "dynamic",
+  imgsz_type: "zeroPad",
   classes: classes,
 };
 
@@ -99,7 +101,7 @@ function App() {
     // Update model state
     setProcessingStatus((prev) => ({
       ...prev,
-      statusMsg: "Loading model...",
+      statusMsg: "Lade Modell...",
       statusColor: "red",
     }));
     setActiveFeature("loading");
@@ -120,7 +122,7 @@ function App() {
       sessionRef.current = modelCache.current[cacheKey];
       setProcessingStatus((prev) => ({
         ...prev,
-        statusMsg: "Model loaded from cache",
+        statusMsg: "Modell aus chache geladen",
         statusColor: "green",
       }));
       setActiveFeature(null);
@@ -138,14 +140,14 @@ function App() {
 
       setProcessingStatus((prev) => ({
         ...prev,
-        statusMsg: "Model loaded",
+        statusMsg: "Modell geladen",
         statusColor: "green",
         warnUpTime: (end - start).toFixed(2),
       }));
     } catch (error) {
       setProcessingStatus((prev) => ({
         ...prev,
-        statusMsg: "Model loading failed",
+        statusMsg: "Modell konnte nicht geladen werden",
         statusColor: "red",
       }));
       console.error(error);
@@ -251,6 +253,7 @@ function App() {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
+      // console.log("Render Overlay Klassen:",modelConfigRef.current.classes);
       await render_overlay(
         results,
         overlayCtx,
@@ -335,7 +338,7 @@ function App() {
 
         setProcessingStatus((prev) => ({
           ...prev,
-          statusMsg: "Opening camera...",
+          statusMsg: "öffne Kamera...",
           statusColor: "blue",
         }));
 
@@ -355,7 +358,7 @@ function App() {
           setActiveFeature("camera");
           setProcessingStatus((prev) => ({
             ...prev,
-            statusMsg: "Camera opened successfully",
+            statusMsg: "Kamera erfolgreich geöffnet",
             statusColor: "green",
           }));
         } catch (streamErr) {
@@ -363,7 +366,7 @@ function App() {
 
           setProcessingStatus((prev) => ({
             ...prev,
-            statusMsg: "Trying to open any available camera...",
+            statusMsg: "Versuche Kamera zu öffnen...",
             statusColor: "blue",
           }));
 
@@ -472,10 +475,10 @@ function App() {
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
-        <span className="block sm:inline">YOLO Multi-Task</span>
+        <span className="block sm:inline">Tiedemanns</span>
         <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
           {" "}
-          Object Detection
+          Heidelbeer-Detektor V1.0
         </span>
       </h1>
       <SettingsPanel

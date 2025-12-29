@@ -6,7 +6,7 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
       <details className="text-gray-200 group">
         <summary className="flex items-center cursor-pointer select-none">
           <div className="flex-1 text-lg sm:text-xl font-bold border-b border-gray-700 pb-2">
-            Detection Results ({details.length})
+            Erkennungsergebnis ({details.length})
           </div>
           <div className="text-gray-400">
             <svg
