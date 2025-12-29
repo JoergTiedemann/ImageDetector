@@ -26,6 +26,7 @@ export async function inference_pipeline(
   model_config
 ) {
   try {
+    // console.log("Image source:", imageSource," Session:",session," Overlay size:",overlay_size," Model config:",model_config);
     // Read DOM to cv.Mat
     const src_mat = cv.imread(imageSource);
 

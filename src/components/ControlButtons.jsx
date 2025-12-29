@@ -1,5 +1,7 @@
 import React, { memo } from "react";
 
+const bEnableLoadButtons = false;
+
 const ControlButtons = memo(function ControlButtons({
   imgSrc,
   fileVideoRef,
@@ -164,7 +166,8 @@ const ControlButtons = memo(function ControlButtons({
             </>
           )}
         </button>
-
+        {bEnableLoadButtons===true ? (
+          <>
         <button
           className="btn-secondary flex items-center justify-center"
           onClick={(e) => {
@@ -220,6 +223,8 @@ const ControlButtons = memo(function ControlButtons({
           </svg>
           Classes.json hinzufügen
         </button>
+        </>
+        ) : <></>}
       </div>
     </div>
   );

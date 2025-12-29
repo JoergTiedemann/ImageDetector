@@ -1,10 +1,12 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader } from "./utils/model_loader";
+import { model_loader,model_loadernew } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay } from "./utils/render_overlay";
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
+import packageJson from "../package.json"; // Pfad anpassen!
+const appVersion = packageJson.version;
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -23,7 +25,7 @@ const MODEL_CONFIG = {
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad",
-  classes: classes,
+  classes: { classes: [...berry.berry] },
 };
 
 function App() {
@@ -117,12 +119,12 @@ function App() {
       : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
     modelConfig.model_path = model_path;
 
-    const cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
+    let cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
     if (modelCache.current[cacheKey]) {
       sessionRef.current = modelCache.current[cacheKey];
       setProcessingStatus((prev) => ({
         ...prev,
-        statusMsg: "Modell aus chache geladen",
+        statusMsg: "Modell aus chache geladen:" + modelConfig.backend,
         statusColor: "green",
       }));
       setActiveFeature(null);
@@ -132,7 +134,11 @@ function App() {
     try {
       // Load model
       const start = performance.now();
-      const yolo_model = await model_loader(model_path, modelConfig.backend);
+      const {  yolo_model, provider }  = await model_loadernew(model_path, modelConfig.backend);
+      modelConfig.backend = provider;
+      let cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
+
+      // const yolo_model = await model_loader(model_path, modelConfig.backend);
       const end = performance.now();
 
       sessionRef.current = yolo_model;
@@ -140,7 +146,7 @@ function App() {
 
       setProcessingStatus((prev) => ({
         ...prev,
-        statusMsg: "Modell geladen",
+        statusMsg: "Modell geladen: " + provider,
         statusColor: "green",
         warnUpTime: (end - start).toFixed(2),
       }));
@@ -478,25 +484,10 @@ function App() {
         <span className="block sm:inline">Tiedemanns</span>
         <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
           {" "}
-          Heidelbeer-Detektor V1.0
+          Heidelbeer-Detektor {appVersion}
+
         </span>
       </h1>
-      <SettingsPanel
-        backendSelectorRef={backendSelectorRef}
-        modelSelectorRef={modelSelectorRef}
-        taskSelectorRef={taskSelectorRef}
-        cameraSelectorRef={cameraSelectorRef}
-        imgszTypeSelectorRef={imgszTypeSelectorRef}
-        modelConfigRef={modelConfigRef}
-        customClasses={customClasses}
-        classFileSelectedRef={classFileSelectedRef}
-        cameras={cameras}
-        customModels={customModels}
-        loadModel={loadModel}
-        activeFeature={activeFeature}
-        defaultClasses={classes}
-      />
-
       <ImageDisplay
         cameraRef={cameraRef}
         imgRef={imgRef}
@@ -517,6 +508,10 @@ function App() {
         handle_AddClassesFile={handle_AddClassesFile}
         activeFeature={activeFeature}
       />
+      <ResultsTable
+        details={details}
+        currentClasses={modelConfigRef.current.classes.classes}
+      />
 
       <ModelStatus
         warnUpTime={processingStatus.warnUpTime}
@@ -524,11 +519,22 @@ function App() {
         statusMsg={processingStatus.statusMsg}
         statusColor={processingStatus.statusColor}
       />
-
-      <ResultsTable
-        details={details}
-        currentClasses={modelConfigRef.current.classes.classes}
+      <SettingsPanel
+        backendSelectorRef={backendSelectorRef}
+        modelSelectorRef={modelSelectorRef}
+        taskSelectorRef={taskSelectorRef}
+        cameraSelectorRef={cameraSelectorRef}
+        imgszTypeSelectorRef={imgszTypeSelectorRef}
+        modelConfigRef={modelConfigRef}
+        customClasses={customClasses}
+        classFileSelectedRef={classFileSelectedRef}
+        cameras={cameras}
+        customModels={customModels}
+        loadModel={loadModel}
+        activeFeature={activeFeature}
+        defaultClasses={classes}
       />
+
     </div>
   );
 }
