@@ -60,7 +60,7 @@ const SettingsPanel = memo(function SettingsPanel({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
-                  Verfahren:
+                  KI-Prozessor:
                 </label>
                 <select
                   name="device-selector"
@@ -72,6 +72,7 @@ const SettingsPanel = memo(function SettingsPanel({
                   disabled={activeFeature !== null}
                   className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
                 >
+                  <option value="auto">Automatisch</option>
                   <option value="wasm">CPU</option>
                   <option value="webgpu">Grafikprozessor</option>
                 </select>
@@ -128,7 +129,7 @@ const SettingsPanel = memo(function SettingsPanel({
                 </select>
               </div>
 
-              <div className="flex flex-col hidden">
+              <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
                   Klassen:
                 </label>

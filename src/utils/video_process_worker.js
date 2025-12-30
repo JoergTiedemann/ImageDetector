@@ -9,8 +9,11 @@ self.onmessage = async function (e) {
   const { file, modelConfig } = e.data;
 
   // Model
+  if (backend === "auto") {
+    backend = "wasm"; // Fallback
+  }
   const yolo_model = await InferenceSession.create(modelConfig.model_path, {
-    executionProviders: [modelConfig.backend],
+    executionProviders: [backend],
   });
 
   // State variables
