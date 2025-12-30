@@ -1,6 +1,6 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader,model_loadernew } from "./utils/model_loader";
+import { model_loader,model_loadernew,detectBackend } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay } from "./utils/render_overlay";
 import classes from "./utils/yolo_classes.json";
@@ -20,7 +20,7 @@ const MODEL_CONFIG = {
   input_shape: [1, 3, 640, 640],
   iou_threshold: 0.35,
   score_threshold: 0.45,
-  backend: "wasm",
+  backend: "auto",
   model: "berry2k_50",
   model_path: "",
   task: "detect",
@@ -83,6 +83,24 @@ function App() {
     videoWorkerRef.current = videoWorker;
   }, []);
 
+  // Zusätzlich: beim Verlassen der Seite Session freigeben
+  useEffect(() => {
+    const cleanup = () => {
+      if (sessionRef.current) {
+        try {
+          sessionRef.current.release?.();
+          sessionRef.current.dispose?.();
+          console.log("Session beim Unload freigegeben");
+        } catch (err) {
+          console.warn("Fehler beim Freigeben beim Unload:", err);
+        }
+      }
+      modelCache.current = {};
+    };
+    window.addEventListener("beforeunload", cleanup);
+    return () => window.removeEventListener("beforeunload", cleanup);
+  }, []);
+
   const videoWorkerMessage = useCallback((e) => {
     setProcessingStatus((prev) => ({
       ...prev,
@@ -109,6 +127,19 @@ const loadModel = useCallback(async () => {
   loadingRef.current = true;
 
   try {
+    // Alte Session freigeben
+    if (sessionRef.current) {
+      try {
+        await sessionRef.current.release?.();
+        sessionRef.current.dispose?.();
+        console.log("Alte Session freigegeben");
+      } catch (disposeErr) {
+        console.warn("Fehler beim Freigeben der alten Session:", disposeErr);
+      }
+      sessionRef.current = null;
+    }
+    modelCache.current = {};
+
     setProcessingStatus(prev => ({
       ...prev,
       statusMsg: "Lade Modell...",
@@ -123,26 +154,35 @@ const loadModel = useCallback(async () => {
       : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
     modelConfig.model_path = model_path;
 
-    let cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
-    if (modelCache.current[cacheKey]) {
-      sessionRef.current = modelCache.current[cacheKey];
-      setProcessingStatus(prev => ({
-        ...prev,
-        statusMsg: "Modell aus Cache geladen: " + modelConfig.backend,
-        statusColor: "green",
-      }));
-      setActiveFeature(null);
-      return;
-    }
-
+    let backend = await detectBackend();
+    console.log("Start Model laden");
     const start = performance.now();
-    const { yolo_model, provider } = await model_loader(model_path,modelConfig.backend);
-    // const { yolo_model, provider } = await model_loadernew(model_path);
-    modelConfig.backend = provider;
-    cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
+    let yolo_model;
+    let provider;
+    // wenn das backend auf auto steht, automatisch wählen
+    if (modelConfig.backend === "auto") {
+      if (backend === "webgpu") {
+        const result  = await model_loadernew(model_path);
+        yolo_model = result.yolo_model;
+        provider  = result.provider;
+      }else {
+        const result = await model_loader(model_path, backend);
+        yolo_model = result.yolo_model;
+        provider = result.provider;
+      }
+    } else {
+      // festes backend
+      backend = modelConfig.backend;
+      const result = await model_loader(model_path, backend);
+      yolo_model = result.yolo_model;
+      provider = result.provider;
+    }
+    console.log("Ende Model laden");
+    backend = provider;
     const end = performance.now();
 
     sessionRef.current = yolo_model;
+    const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
     modelCache.current[cacheKey] = yolo_model;
 
     setProcessingStatus(prev => ({
@@ -152,17 +192,19 @@ const loadModel = useCallback(async () => {
       warnUpTime: (end - start).toFixed(2),
     }));
   } catch (error) {
+    console.error("catch:" + error.message);
     setProcessingStatus(prev => ({
       ...prev,
       statusMsg: "Modell konnte nicht geladen werden: " + error.message,
       statusColor: "red",
     }));
-    console.error(error);
   } finally {
     setActiveFeature(null);
-    loadingRef.current = false; // Lock wieder freigeben
+    loadingRef.current = false;
   }
 }, [customModels]);
+
+
 
 
   // const loadModel = useCallback(async () => {
