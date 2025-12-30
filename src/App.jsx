@@ -205,71 +205,6 @@ const loadModel = useCallback(async () => {
 }, [customModels]);
 
 
-
-
-  // const loadModel = useCallback(async () => {
-  //   // Update model state
-  //   setProcessingStatus((prev) => ({
-  //     ...prev,
-  //     statusMsg: "Lade Modell...",
-  //     statusColor: "red",
-  //   }));
-  //   setActiveFeature("loading");
-
-  //   const modelConfig = modelConfigRef.current;
-
-  //   // Get model path
-  //   const customModel = customModels.find(
-  //     (model) => model.url === modelConfig.model
-  //   );
-  //   const model_path = customModel
-  //     ? customModel.url
-  //     : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
-  //   modelConfig.model_path = model_path;
-
-  //   let cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
-  //   if (modelCache.current[cacheKey]) {
-  //     sessionRef.current = modelCache.current[cacheKey];
-  //     setProcessingStatus((prev) => ({
-  //       ...prev,
-  //       statusMsg: "Modell aus chache geladen:" + modelConfig.backend,
-  //       statusColor: "green",
-  //     }));
-  //     setActiveFeature(null);
-  //     return;
-  //   }
-
-  //   try {
-  //     // Load model
-  //     const start = performance.now();
-  //     const {  yolo_model, provider }  = await model_loadernew(model_path, modelConfig.backend);
-  //     modelConfig.backend = provider;
-  //     let cacheKey = `${modelConfig.model}-${modelConfig.task}-${modelConfig.backend}`;
-
-  //     // const yolo_model = await model_loader(model_path, modelConfig.backend);
-  //     const end = performance.now();
-
-  //     sessionRef.current = yolo_model;
-  //     modelCache.current[cacheKey] = yolo_model;
-
-  //     setProcessingStatus((prev) => ({
-  //       ...prev,
-  //       statusMsg: "Modell geladen: " + provider,
-  //       statusColor: "green",
-  //       warnUpTime: (end - start).toFixed(2),
-  //     }));
-  //   } catch (error) {
-  //     setProcessingStatus((prev) => ({
-  //       ...prev,
-  //       statusMsg: "Modell konnte nicht geladen werden",
-  //       statusColor: "red",
-  //     }));
-  //     console.error(error);
-  //   } finally {
-  //     setActiveFeature(null);
-  //   }
-  // }, [customModels]);
-
   // Button add model
   const handle_AddModel = useCallback((event) => {
     const file = event.target.files[0];
@@ -554,10 +489,15 @@ const loadModel = useCallback(async () => {
       );
       render_overlay(
         results,
-        modelConfigRef.current.task,
         overlayCtx,
         modelConfigRef.current.classes
       );
+      // render_overlay(
+      //   results,
+      //   modelConfigRef.current.task,
+      //   overlayCtx,
+      //   modelConfigRef.current.classes
+      // );
 
       setDetails(results.bbox_results);
       setProcessingStatus((prev) => ({
