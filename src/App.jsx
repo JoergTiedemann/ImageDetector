@@ -58,6 +58,8 @@ function App() {
   const [customModels, setCustomModels] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [imgSrc, setImgSrc] = useState(null);
+  const [videoSrc, setVideoSrc] = useState(null);
+
   const [details, setDetails] = useState([]);
   const [activeFeature, setActiveFeature] = useState(null); // null, 'video', 'image', 'camera'
 
@@ -101,21 +103,28 @@ function App() {
     return () => window.removeEventListener("beforeunload", cleanup);
   }, []);
 
-  const videoWorkerMessage = useCallback((e) => {
-    setProcessingStatus((prev) => ({
-      ...prev,
-      statusMsg: e.data.statusMsg,
-    }));
-    if (e.data.processedVideo) {
-      const url = URL.createObjectURL(e.data.processedVideo);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "processed_video.mp4";
-      a.click();
-      URL.revokeObjectURL(url);
-      setActiveFeature(null);
+const videoWorkerMessage = useCallback((e) => {
+  setProcessingStatus((prev) => ({
+    ...prev,
+    statusMsg: e.data.statusMsg,
+  }));
+  if (e.data.processedVideo) {
+    const url = URL.createObjectURL(e.data.processedVideo);
+    setVideoSrc(url); // Setze das Video für die Anzeige
+    setActiveFeature("processedVideo"); // Neue Feature für verarbeitete Videos
+    // Optional: URL später freigeben, z.B. beim nächsten Video oder Unmount
+    // URL.revokeObjectURL(url); // Entferne dies, um das Video abzuspielen
+  }
+}, []);
+
+useEffect(() => {
+  return () => {
+    if (videoSrc) {
+      URL.revokeObjectURL(videoSrc);
     }
-  }, []);
+  };
+}, [videoSrc]);
+
 
 const loadingRef = useRef(false);
 
@@ -540,10 +549,12 @@ const loadModel = useCallback(async () => {
         imgRef={imgRef}
         overlayRef={overlayRef}
         imgSrc={imgSrc}
+        videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoad}
+        onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
         activeFeature={activeFeature}
-      />
+      />      
       <ControlButtons
         imgSrc={imgSrc}
         fileVideoRef={fileVideoRef}

@@ -5,8 +5,10 @@ const ImageDisplay = memo(function ImageDisplay({
   imgRef,
   overlayRef,
   imgSrc,
+  videoSrc, // Neu: Prop für verarbeitete Videos
   onCameraLoad,
   onImageLoad,
+  onVideoEnd, // Neu: Callback für Video-Ende
   activeFeature,
 }) {
   return (
@@ -55,6 +57,16 @@ const ImageDisplay = memo(function ImageDisplay({
         hidden={activeFeature !== "image"}
         className="block max-h-[400px] sm:max-h-[640px] rounded-lg mx-auto object-contain"
         alt="Uploaded"
+      />
+      {/* Neu: Video für verarbeitete Videos */}
+      <video
+        src={videoSrc}
+        hidden={activeFeature !== "processedVideo"}
+        className="block max-h-[400px] sm:max-h-[640px] rounded-lg mx-auto object-contain"
+        controls // Füge Controls hinzu, um Play/Pause zu erlauben
+        autoPlay // Automatisch abspielen
+        onLoadedMetadata={() => console.log("Processed video loaded")}
+        onEnded={onVideoEnd} // Neu: Setze activeFeature zurück, wenn Video endet
       />
       <canvas
         ref={overlayRef}

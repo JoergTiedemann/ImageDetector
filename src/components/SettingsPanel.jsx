@@ -88,10 +88,10 @@ const SettingsPanel = memo(function SettingsPanel({
                       modelConfigRef.current.model = selectedModel;
 
                       // Klassen automatisch setzen
-                      console.log("selectedModel:", selectedModel);
+                      // console.log("selectedModel:", selectedModel);
                       const mappedClass = modelClassMap[selectedModel];
-                      console.log("mappedClass:", mappedClass," modelClassMap:", modelClassMap);
-                      console.log("berry9kclasses:", berry.berry9k);
+                      // console.log("mappedClass:", mappedClass," modelClassMap:", modelClassMap);
+                      // console.log("berry9kclasses:", berry.berry9k);
                       if (mappedClass === "default") {
                         modelConfigRef.current.classes = defaultClasses;
                         classFileSelectedRef.current.value = "default";
@@ -163,7 +163,7 @@ const SettingsPanel = memo(function SettingsPanel({
                       const selectedIndex = parseInt(e.target.value);
                       modelConfigRef.current.classes = customClasses[selectedIndex].data;
                     }
-                    console.log("modelConfigRef.current.classes:", modelConfigRef.current.classes);
+                    // console.log("modelConfigRef.current.classes:", modelConfigRef.current.classes);
                   }}
                   className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
                 >

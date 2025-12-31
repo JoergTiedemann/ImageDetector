@@ -28,7 +28,16 @@ export async function inference_pipeline(
   try {
     // console.log("Image source:", imageSource," Session:",session," Overlay size:",overlay_size," Model config:",model_config);
     // Read DOM to cv.Mat
-    const src_mat = cv.imread(imageSource);
+    let src_mat;
+    if (imageSource instanceof OffscreenCanvas) {
+      // Für Worker: OffscreenCanvas verwenden
+      const ctx = imageSource.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, imageSource.width, imageSource.height);
+      src_mat = cv.matFromImageData(imgData);
+    } else {
+      // Für Hauptthread: HTMLImageElement oder HTMLCanvasElement
+      src_mat = cv.imread(imageSource);
+    }
 
     // Pre-process img, inference
     const [input_tensor, xRatio, yRatio] = preProcess_img(
@@ -124,6 +133,3 @@ function postProcess_detect(
   }
   return results;
 }
-
-
-
