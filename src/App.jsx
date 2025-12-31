@@ -21,11 +21,11 @@ const MODEL_CONFIG = {
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "auto",
-  model: "berry2k_50",
+  model: "berry9k_Epoch100",
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad",
-  classes: { classes: [...berry.berry] },
+  classes: { classes: [...berry.berry9k] },
 };
 
 function App() {
@@ -529,11 +529,10 @@ const loadModel = useCallback(async () => {
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
-        <span className="block sm:inline">Tiedemanns</span>
+        <span className="block sm:inline"></span>
         <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
           {" "}
-          Heidelbeer-Detektor {appVersion}
-
+          Smart Fruit Detector {appVersion}
         </span>
       </h1>
       <ImageDisplay

@@ -36,8 +36,8 @@ export async function detectBackend() {
 
   // Entscheidung
   if (isIPhoneSE) {
-    console.log("iPhone SE erkannt → Backend = wasm");
-    return "wasm";
+    console.log("iPhone SE erkannt → Backend = webgpu test");
+    return "webgpu";
   }
 
   if (isIOS) {
