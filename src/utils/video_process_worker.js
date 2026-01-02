@@ -1,21 +1,45 @@
 import cv from "@techstark/opencv-js";
 import { InferenceSession } from "onnxruntime-web/webgpu";
 import { MP4Demuxer } from "./demuxer";
+import { detectBackend } from "./model_loader";
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import { inference_pipeline } from "./inference_pipeline";
 import { render_overlay } from "./render_overlay";
 
+var yolo_model;
+
 self.onmessage = async function (e) {
   const { file, modelConfig } = e.data;
 
-  // Model
-  let backend = modelConfig.backend;
-  if (backend === "auto") {
-    backend = "wasm"; // Fallback
+  if (e.data.type === "cleanup") {
+    self.postMessage({ statusMsg: `Worker shutdown` });
+    // Ressourcen freigeben, z. B. Buffers schließen
+    await yolo_model.release?.();
+    yolo_model.dispose?.();
+    self.postMessage({ statusMsg: `Worker beendet` });
+    self.close();
   }
-  const yolo_model = await InferenceSession.create(modelConfig.model_path, {
+try {
+  
+
+  console.log("Start videoworker");
+  self.postMessage({ statusMsg: `Worker gestartet` });
+
+  // Model
+  let backend = await detectBackend();
+  // wenn das backend nicht auf auto steht, manuell vorwählen
+  if (modelConfig.backend !== "auto") {
+    // festes backend
+    backend = modelConfig.backend;
+  }
+  console.log("Start videoworker backend:", backend);
+  self.postMessage({ statusMsg: `Start videoworker backend:${backend}`});
+
+   yolo_model = await InferenceSession.create(modelConfig.model_path, {
     executionProviders: [backend],
   });
+  console.log("yolo model loaded in videoworker");
+  self.postMessage({ statusMsg: `yolo model loaded in videoworker` });
 
   // State variables
   let inputCanvas, inputCtx, resultCanvas, resultCtx;
@@ -35,9 +59,13 @@ self.onmessage = async function (e) {
   let decoderActive = true;
 
   // Einstellungen für Frame-Skip und Max-Frames
-  const frameSkip = 20; // Verarbeite jeden 20. Frame (ändere nach Bedarf, z.B. 1 für alle Frames)
-  const maxFrames = 50; // Maximale Anzahl verarbeiteter Frames (ändere nach Bedarf, z.B. Infinity für unbegrenzt)
-
+  let frameSkip = 20; // Verarbeite jeden 20. Frame (ändere nach Bedarf, z.B. 1 für alle Frames)
+  let maxFrames = 50; // Maximale Anzahl verarbeiteter Frames (ändere nach Bedarf, z.B. Infinity für unbegrenzt)
+  if (backend === "webgpu") 
+  {
+    frameSkip = 5; // Verarbeite jeden 20. Frame (ändere nach Bedarf, z.B. 1 für alle Frames)
+    maxFrames = Infinity; // Maximale Anzahl verarbeiteter Frames (ändere nach Bedarf, z.B. Infinity für unbegrenzt)
+  }
   const onConfig = (config) => {
     totalFrames = config.nb_frames;
 
@@ -173,8 +201,8 @@ self.onmessage = async function (e) {
       self.postMessage({
         statusMsg: `${
           Math.floor(Date.now() / 1000) % 2 === 0 ? "⚫" : "🔴"
-        } Processing - ${processedFrameCount}/${Math.min(maxFrames, totalFrames || Infinity)} (${inferenceTime}ms)`,
-        progress: totalFrames > 0 ? processedFrameCount / Math.min(maxFrames, totalFrames) : 0,
+        } Processing - ${frameCount}/${Math.min(maxFrames, totalFrames || Infinity)} (${inferenceTime}ms)`,
+        progress: totalFrames > 0 ? frameCount / Math.min(maxFrames, totalFrames) : 0,
       });
     } catch (e) {
       console.error("Frame process error:", e);
@@ -222,6 +250,8 @@ self.onmessage = async function (e) {
     } catch (e) {
       console.error("Video Processing Error:", e);
       self.postMessage({ statusMsg: `Video Processing Error: ${e.message}` });
+      await yolo_model.release?.();
+      yolo_model.dispose?.();
       self.close(); // Auch bei Fehler beenden
     }
   }
@@ -234,4 +264,12 @@ self.onmessage = async function (e) {
     console.error("Demuxer Initialize Error:", e);
     self.postMessage({ statusMsg: `Demuxer Initialize Error: ${e.message}` });
   }
+} catch (e) {
+  console.error("Videoworker Fehler:", e);
+        self.postMessage({
+          statusMsg: `Videoworker Fehler: ${e.message}`,
+          abnormalTerminate: true,
+        });
+
+}
 };

@@ -121,8 +121,8 @@ const SettingsPanel = memo(function SettingsPanel({
                   <option value="berry9k_Epoch100">Blaubeeren</option>
                   <option value="berry2k_100">Blaubeeren + Blüten</option>
                   <option value="yolo11n">allgemeine Objekte (2.6M)</option>
-                  <option value="yolo11s">YOLO11s (9.4M)</option>
-                  <option value="yolo12n">YOLO12n (2.6M)</option>
+                  {/* <option value="yolo11s">YOLO11s (9.4M)</option>
+                  <option value="yolo12n">YOLO12n (2.6M)</option> */}
                   {customModels.map((model, index) => (
                     <option key={index} value={model.url}>
                       {model.name}
@@ -131,7 +131,7 @@ const SettingsPanel = memo(function SettingsPanel({
                 </select>
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col" hidden>
                 <label className="text-gray-300 mb-1 text-sm font-medium">
                   Klassen:
                 </label>

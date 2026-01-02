@@ -30,9 +30,11 @@ export async function detectBackend() {
   const isIOS = /iPad|iPhone|iPod/.test(ua);
 
   // iPhone SE über Screen-Größe erkennen (kleiner Speicher)
-  const width = window.screen.width;
-  const height = window.screen.height;
-  const isIPhoneSE =isIPhoneSEDevice();
+  let isIPhoneSE = false;
+  if (typeof globalThis.window !== "undefined") {
+    // Main Thread
+    isIPhoneSE = isIPhoneSEDevice();
+  }
 
   // Entscheidung
   if (isIPhoneSE) {

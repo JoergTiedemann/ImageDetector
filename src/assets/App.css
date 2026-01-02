@@ -37,6 +37,12 @@
     disabled:active:bg-red-600 disabled:shadow-none;
 }
 
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #737579; /* optional: hellgrauer Hintergrund */
+  color: #cbced3;            /* optional: Textfarbe grau */
+}
 .container {
   @apply transition-all duration-300 ease-in-out;
 }

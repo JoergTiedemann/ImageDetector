@@ -28,6 +28,13 @@ const MODEL_CONFIG = {
   classes: { classes: [...berry.berry9k] },
 };
 
+
+// const worker = new Worker(
+//       new URL("./worker.js", import.meta.url), // Vite bundelt den Pfad korrekt
+//       { type: "module" }                       // funktioniert ab iOS 16+
+//     );
+
+
 function App() {
   const [processingStatus, setProcessingStatus] = useState({
     warnUpTime: 0,
@@ -76,13 +83,19 @@ function App() {
     loadModel();
 
     // Worker setup
-    const videoWorker = new Worker(
-      new URL("./utils/video_process_worker.js", import.meta.url),
-      { type: "module" }
-    );
+    // const videoWorker = new Worker(
+    //   new URL("./utils/video_process_worker.js", import.meta.url),
+    //   { type: "module" }
+    // );
+    // getCameras();
 
-    videoWorker.onmessage = videoWorkerMessage;
-    videoWorkerRef.current = videoWorker;
+    // worker.onmessage = (e) => {
+    //   console.log("Antwort vom Worker:", e.data.reply);
+    // };
+
+
+    // videoWorker.onmessage = videoWorkerMessage;
+    // videoWorkerRef.current = videoWorker;
   }, []);
 
   // Zusätzlich: beim Verlassen der Seite Session freigeben
@@ -108,12 +121,18 @@ const videoWorkerMessage = useCallback((e) => {
     ...prev,
     statusMsg: e.data.statusMsg,
   }));
+  console.log("Video Worker Message empfangen:", e.data.statusMsg);
   if (e.data.processedVideo) {
     const url = URL.createObjectURL(e.data.processedVideo);
     setVideoSrc(url); // Setze das Video für die Anzeige
     setActiveFeature("processedVideo"); // Neue Feature für verarbeitete Videos
     // Optional: URL später freigeben, z.B. beim nächsten Video oder Unmount
     // URL.revokeObjectURL(url); // Entferne dies, um das Video abzuspielen
+  }
+  if (e.data.abnormalTerminate) {
+    console.log("Videoworker abnormal beendet, lade Modell neu");
+      setActiveFeature(null);
+      loadModel();
   }
 }, []);
 
@@ -269,6 +288,13 @@ const loadModel = useCallback(async () => {
     reader.readAsText(file);
   }, []);
 
+  // Button Close Video
+  const handle_CloseVideo = useCallback(() => {
+    setVideoSrc(null);
+    setActiveFeature(null);
+    loadModel();
+  }, []);
+
   // Button Upload Image
   const handle_OpenImage = useCallback(
     (imgUrl = null) => {
@@ -329,46 +355,46 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Get camera list
+  function selectDefaultCamera(devices) {
+    const backCam = devices.find(cam =>
+      cam.label.toLowerCase().includes("back") ||
+      cam.label.toLowerCase().includes("rear") ||
+      cam.label.toLowerCase().includes("Rück")
+    );
+    if (cameraSelectorRef.current) {
+      cameraSelectorRef.current.value = backCam
+        ? backCam.deviceId
+        : devices[0]?.deviceId || "";
+    }
+  }
+
   const getCameras = useCallback(async () => {
     try {
-      // get camera list
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(
-        (device) => device.kind === "videoinput"
-      );
+      let videoDevices = devices.filter(d => d.kind === "videoinput");
 
-      // if no labels, try request permission to get labels
       if (videoDevices.length > 0 && !videoDevices[0].label) {
         try {
-          const tempStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
-          tempStream.getTracks().forEach((track) => track.stop());
-
-          const updatedDevices =
-            await navigator.mediaDevices.enumerateDevices();
-          const updatedVideoDevices = updatedDevices.filter(
-            (device) => device.kind === "videoinput"
-          );
-
-          setCameras(updatedVideoDevices);
-          return updatedVideoDevices;
+          const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          tempStream.getTracks().forEach(track => track.stop());
+          const updatedDevices = await navigator.mediaDevices.enumerateDevices();
+          videoDevices = updatedDevices.filter(d => d.kind === "videoinput");
         } catch (err) {
           console.error("Error getting camera permissions:", err);
-          setCameras(videoDevices);
-          return videoDevices;
         }
-      } else {
-        setCameras(videoDevices);
-        return videoDevices;
       }
+
+      setCameras(videoDevices);
+      selectDefaultCamera(videoDevices);
+      return videoDevices;
     } catch (err) {
       console.error("Error enumerating devices:", err);
       setCameras([]);
+      if (cameraSelectorRef.current) cameraSelectorRef.current.value = "";
       return [];
     }
   }, []);
+
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
@@ -386,12 +412,12 @@ const loadModel = useCallback(async () => {
       try {
         setProcessingStatus((prev) => ({
           ...prev,
-          statusMsg: "Getting camera list...",
+          statusMsg: "Kameraliste auslesen...",
           statusColor: "blue",
         }));
         const currentCameras = await getCameras();
         if (currentCameras.length === 0) {
-          throw new Error("No available camera devices found");
+          throw new Error("keine Kameras gefunden");
         }
 
         setProcessingStatus((prev) => ({
@@ -402,7 +428,20 @@ const loadModel = useCallback(async () => {
 
         const selectedDeviceId = cameraSelectorRef.current
           ? cameraSelectorRef.current.value
-          : currentCameras[0].deviceId;
+          : (() => {
+              // Suche nach Rückkamera
+              const backCam = currentCameras.find(cam =>
+                cam.label.toLowerCase().includes("back") ||
+                cam.label.toLowerCase().includes("rear") ||
+                cam.label.toLowerCase().includes("Rück")
+              );
+              return backCam ? backCam.deviceId : currentCameras[0].deviceId;
+            })();
+
+
+        // const selectedDeviceId = cameraSelectorRef.current
+        //   ? cameraSelectorRef.current.value
+        //   : currentCameras[0].deviceId;
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -420,7 +459,7 @@ const loadModel = useCallback(async () => {
             statusColor: "green",
           }));
         } catch (streamErr) {
-          console.error("Failed to open selected camera:", streamErr);
+          console.error("Fehler beim öffnen der Kamera:", streamErr);
 
           setProcessingStatus((prev) => ({
             ...prev,
@@ -520,8 +559,54 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Button Upload Video
-  const handle_OpenVideo = useCallback((file) => {
+
+// src/main.js
+  const handle_OpenVideoTest = useCallback((file) => {
+    // Test-Nachricht an Worker
+    console.log("Sende Nachricht an Worker");
+    worker.postMessage({ msg: "Hallo vom Mainthread" });
+  }, [videoWorkerMessage]);
+
+
+  const handle_OpenVideo = useCallback( async (file) => {
     if (file) {
+      try {
+      // Alte Session freigeben
+      if (sessionRef.current) {
+        try {
+          await sessionRef.current.release?.();
+          sessionRef.current.dispose?.();
+          console.log("Alte Session in OpenVideo freigegeben");
+        } catch (disposeErr) {
+          console.warn("Fehler beim Freigeben der alten Session:", disposeErr);
+        }
+        sessionRef.current = null;
+      }
+      modelCache.current = {};
+      } catch (error) {
+        console.error("catch:" + error.message);
+      }
+
+      // Worker ggf. neu starten -> vorher beenden
+      if (videoWorkerRef.current) {
+        console.log("Beende alten Video Worker");
+        videoWorkerRef.current.postMessage({ type: "cleanup" });
+        // videoWorkerRef.current.terminate();
+      }
+
+      // const worker = new Worker(
+//       new URL("./worker.js", import.meta.url), // Vite bundelt den Pfad korrekt
+//       { type: "module" }                       // funktioniert ab iOS 16+
+//     );
+
+
+      const videoWorker = new Worker(
+        new URL("./utils/video_process_worker.js", import.meta.url),
+        { type: "module" }
+      );
+      videoWorker.onmessage = videoWorkerMessage;
+      videoWorkerRef.current = videoWorker;
+      console.log("Starte Video Worker aus main thread");
       videoWorkerRef.current.postMessage(
         {
           file: file,
@@ -533,7 +618,7 @@ const loadModel = useCallback(async () => {
     } else {
       setActiveFeature(null);
     }
-  }, []);
+  }, [videoWorkerMessage]);
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
@@ -541,7 +626,7 @@ const loadModel = useCallback(async () => {
         <span className="block sm:inline"></span>
         <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
           {" "}
-          Smart Fruit Detector {appVersion}
+          Smart Fruit Finder {appVersion}
         </span>
       </h1>
       <ImageDisplay
@@ -552,7 +637,7 @@ const loadModel = useCallback(async () => {
         videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoad}
-        onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
+        // onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
         activeFeature={activeFeature}
       />      
       <ControlButtons
@@ -564,6 +649,7 @@ const loadModel = useCallback(async () => {
         handle_ToggleCamera={handle_ToggleCamera}
         handle_AddModel={handle_AddModel}
         handle_AddClassesFile={handle_AddClassesFile}
+        handle_CloseVideo={handle_CloseVideo}
         activeFeature={activeFeature}
       />
       <ResultsTable
