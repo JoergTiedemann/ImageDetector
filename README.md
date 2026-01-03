@@ -1,5 +1,7 @@
 # Smart Fruit Finder
 Anwendung zu Detektierung von Obst und Beeren mit Vorhersage des Reifegrades und des möglichen Ernteertrags
+## Funktion
+Die Videoverarbeitung (nur MP4 Dateien) wurde bei iphoneSE ausgeblendet. Die Verarbeitung erfolgt in einem separaten video_process_worker und dort wird ein Yolomodell geladen und eine neue Session aufgemacht und dazu sollte webgpu verqendet werden. Das führt auf dem iphoneSE zu Memory Overflow und ist auch sonst von iOS nicht wirklich supportet (webgpu in workern wird offiziell nicht unterstützt)
 
 ## Yolo Modelle
 Es werden Datensätze von universe.roboflow.com verwendet die nach dem download selbst trainiert werden kömnnen. Dabei werden Yolov8n Modelle erzeugt

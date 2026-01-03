@@ -20,8 +20,7 @@ self.onmessage = async function (e) {
     self.close();
   }
 try {
-  
-
+ 
   console.log("Start videoworker");
   self.postMessage({ statusMsg: `Worker gestartet` });
 

@@ -1,12 +1,14 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader,model_loadernew,detectBackend } from "./utils/model_loader";
+import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay } from "./utils/render_overlay";
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
 import packageJson from "../package.json"; // Pfad anpassen!
 const appVersion = packageJson.version;
+const isIPhoneSE = isIPhoneSEDevice();
+
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -28,11 +30,6 @@ const MODEL_CONFIG = {
   classes: { classes: [...berry.berry9k] },
 };
 
-
-// const worker = new Worker(
-//       new URL("./worker.js", import.meta.url), // Vite bundelt den Pfad korrekt
-//       { type: "module" }                       // funktioniert ab iOS 16+
-//     );
 
 
 function App() {
@@ -82,17 +79,7 @@ function App() {
   useEffect(() => {
     loadModel();
 
-    // Worker setup
-    // const videoWorker = new Worker(
-    //   new URL("./utils/video_process_worker.js", import.meta.url),
-    //   { type: "module" }
-    // );
     // getCameras();
-
-    // worker.onmessage = (e) => {
-    //   console.log("Antwort vom Worker:", e.data.reply);
-    // };
-
 
     // videoWorker.onmessage = videoWorkerMessage;
     // videoWorkerRef.current = videoWorker;
@@ -132,7 +119,7 @@ const videoWorkerMessage = useCallback((e) => {
   if (e.data.abnormalTerminate) {
     console.log("Videoworker abnormal beendet, lade Modell neu");
       setActiveFeature(null);
-      loadModel();
+      // loadModel();
   }
 }, []);
 
@@ -559,47 +546,15 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Button Upload Video
-
-// src/main.js
-  const handle_OpenVideoTest = useCallback((file) => {
-    // Test-Nachricht an Worker
-    console.log("Sende Nachricht an Worker");
-    worker.postMessage({ msg: "Hallo vom Mainthread" });
-  }, [videoWorkerMessage]);
-
-
   const handle_OpenVideo = useCallback( async (file) => {
     if (file) {
-      try {
-      // Alte Session freigeben
-      if (sessionRef.current) {
-        try {
-          await sessionRef.current.release?.();
-          sessionRef.current.dispose?.();
-          console.log("Alte Session in OpenVideo freigegeben");
-        } catch (disposeErr) {
-          console.warn("Fehler beim Freigeben der alten Session:", disposeErr);
-        }
-        sessionRef.current = null;
-      }
-      modelCache.current = {};
-      } catch (error) {
-        console.error("catch:" + error.message);
-      }
-
+  
       // Worker ggf. neu starten -> vorher beenden
       if (videoWorkerRef.current) {
         console.log("Beende alten Video Worker");
         videoWorkerRef.current.postMessage({ type: "cleanup" });
         // videoWorkerRef.current.terminate();
       }
-
-      // const worker = new Worker(
-//       new URL("./worker.js", import.meta.url), // Vite bundelt den Pfad korrekt
-//       { type: "module" }                       // funktioniert ab iOS 16+
-//     );
-
-
       const videoWorker = new Worker(
         new URL("./utils/video_process_worker.js", import.meta.url),
         { type: "module" }
@@ -651,6 +606,7 @@ const loadModel = useCallback(async () => {
         handle_AddClassesFile={handle_AddClassesFile}
         handle_CloseVideo={handle_CloseVideo}
         activeFeature={activeFeature}
+        isiPhoneSe={isIPhoneSE}
       />
       <ResultsTable
         details={details}

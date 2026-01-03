@@ -1,7 +1,7 @@
 import { InferenceSession, Tensor} from "onnxruntime-web";
 // import { InferenceSession, Tensor} from "onnxruntime-web/webgpu";
 
-function isIPhoneSEDevice() {
+export function isIPhoneSEDevice() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const width = window.screen.width;
   const height = window.screen.height;
