@@ -11,7 +11,7 @@ const ModelStatus = memo(function ModelStatus({
       <details className="text-gray-200 group" open>
         <summary className="flex items-center cursor-pointer select-none">
           <div className="flex-1 text-lg sm:text-xl font-bold border-b border-gray-700 pb-2">
-            Status-Meldungen 
+            Erkennungszeit: {inferenceTime} ms 
           </div>
           <div className="text-gray-400">
             <svg
@@ -32,7 +32,7 @@ const ModelStatus = memo(function ModelStatus({
         </summary>
 
         <div className="transition-all duration-300 ease-in-out transform origin-top group-open:animate-details-show mt-3 sm:mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div className="bg-gray-700 p-3 rounded-lg">
               <div className="text-gray-400 text-xs sm:text-sm font-medium mb-1">
                 Modell-Ladezeit
@@ -50,7 +50,7 @@ const ModelStatus = memo(function ModelStatus({
                 {inferenceTime} ms
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="bg-gray-700 p-3 rounded-lg flex items-center">
             <div className="mr-2 sm:mr-3">

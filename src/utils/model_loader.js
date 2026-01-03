@@ -1,7 +1,7 @@
 import { InferenceSession, Tensor} from "onnxruntime-web";
 // import { InferenceSession, Tensor} from "onnxruntime-web/webgpu";
 
-function isIPhoneSEDevice() {
+export function isIPhoneSEDevice() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const width = window.screen.width;
   const height = window.screen.height;
@@ -30,14 +30,16 @@ export async function detectBackend() {
   const isIOS = /iPad|iPhone|iPod/.test(ua);
 
   // iPhone SE über Screen-Größe erkennen (kleiner Speicher)
-  const width = window.screen.width;
-  const height = window.screen.height;
-  const isIPhoneSE =isIPhoneSEDevice();
+  let isIPhoneSE = false;
+  if (typeof globalThis.window !== "undefined") {
+    // Main Thread
+    isIPhoneSE = isIPhoneSEDevice();
+  }
 
   // Entscheidung
   if (isIPhoneSE) {
-    console.log("iPhone SE erkannt → Backend = wasm");
-    return "wasm";
+    console.log("iPhone SE erkannt → Backend = webgpu test");
+    return "webgpu";
   }
 
   if (isIOS) {

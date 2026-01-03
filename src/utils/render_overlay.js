@@ -62,7 +62,7 @@ function draw_object_detection(ctx, predictions, lineWidth, currentClasses) {
       ctx.strokeRect(x1, y1, width, height);
     });
 
-    console.log("draw_object_detection CurrentClasses:",currentClasses," ClassId:", classId);
+    // console.log("draw_object_detection CurrentClasses:",currentClasses," ClassId:", classId);
     // draw score text
     ctx.fillStyle = rgbaBorderColor;
     ctx.font = "16px Arial";

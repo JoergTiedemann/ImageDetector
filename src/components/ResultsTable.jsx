@@ -44,7 +44,7 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
                 />
               </svg>
               <p className="text-gray-400 text-base sm:text-lg">
-                No objects detected
+                Keine Objekte erkannt
               </p>
             </div>
           ) : (
@@ -56,10 +56,10 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
                       ID
                     </th>
                     <th className="p-2 sm:p-3 text-xs sm:text-sm text-left">
-                      Class
+                      Typ
                     </th>
                     <th className="p-2 sm:p-3 rounded-tr-lg text-xs sm:text-sm text-left">
-                      Confidence
+                      Wahrscheinlichkeit
                     </th>
                   </tr>
                 </thead>

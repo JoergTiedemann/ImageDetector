@@ -1,12 +1,14 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader,model_loadernew,detectBackend } from "./utils/model_loader";
+import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay } from "./utils/render_overlay";
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
 import packageJson from "../package.json"; // Pfad anpassen!
 const appVersion = packageJson.version;
+const isIPhoneSE = isIPhoneSEDevice();
+
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -21,12 +23,14 @@ const MODEL_CONFIG = {
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "auto",
-  model: "berry2k_50",
+  model: "berry9k_Epoch100",
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad",
-  classes: { classes: [...berry.berry] },
+  classes: { classes: [...berry.berry9k] },
 };
+
+
 
 function App() {
   const [processingStatus, setProcessingStatus] = useState({
@@ -58,6 +62,8 @@ function App() {
   const [customModels, setCustomModels] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [imgSrc, setImgSrc] = useState(null);
+  const [videoSrc, setVideoSrc] = useState(null);
+
   const [details, setDetails] = useState([]);
   const [activeFeature, setActiveFeature] = useState(null); // null, 'video', 'image', 'camera'
 
@@ -73,14 +79,10 @@ function App() {
   useEffect(() => {
     loadModel();
 
-    // Worker setup
-    const videoWorker = new Worker(
-      new URL("./utils/video_process_worker.js", import.meta.url),
-      { type: "module" }
-    );
+    // getCameras();
 
-    videoWorker.onmessage = videoWorkerMessage;
-    videoWorkerRef.current = videoWorker;
+    // videoWorker.onmessage = videoWorkerMessage;
+    // videoWorkerRef.current = videoWorker;
   }, []);
 
   // Zusätzlich: beim Verlassen der Seite Session freigeben
@@ -101,21 +103,34 @@ function App() {
     return () => window.removeEventListener("beforeunload", cleanup);
   }, []);
 
-  const videoWorkerMessage = useCallback((e) => {
-    setProcessingStatus((prev) => ({
-      ...prev,
-      statusMsg: e.data.statusMsg,
-    }));
-    if (e.data.processedVideo) {
-      const url = URL.createObjectURL(e.data.processedVideo);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "processed_video.mp4";
-      a.click();
-      URL.revokeObjectURL(url);
+const videoWorkerMessage = useCallback((e) => {
+  setProcessingStatus((prev) => ({
+    ...prev,
+    statusMsg: e.data.statusMsg,
+  }));
+  console.log("Video Worker Message empfangen:", e.data.statusMsg);
+  if (e.data.processedVideo) {
+    const url = URL.createObjectURL(e.data.processedVideo);
+    setVideoSrc(url); // Setze das Video für die Anzeige
+    setActiveFeature("processedVideo"); // Neue Feature für verarbeitete Videos
+    // Optional: URL später freigeben, z.B. beim nächsten Video oder Unmount
+    // URL.revokeObjectURL(url); // Entferne dies, um das Video abzuspielen
+  }
+  if (e.data.abnormalTerminate) {
+    console.log("Videoworker abnormal beendet, lade Modell neu");
       setActiveFeature(null);
+      // loadModel();
+  }
+}, []);
+
+useEffect(() => {
+  return () => {
+    if (videoSrc) {
+      URL.revokeObjectURL(videoSrc);
     }
-  }, []);
+  };
+}, [videoSrc]);
+
 
 const loadingRef = useRef(false);
 
@@ -260,6 +275,13 @@ const loadModel = useCallback(async () => {
     reader.readAsText(file);
   }, []);
 
+  // Button Close Video
+  const handle_CloseVideo = useCallback(() => {
+    setVideoSrc(null);
+    setActiveFeature(null);
+    loadModel();
+  }, []);
+
   // Button Upload Image
   const handle_OpenImage = useCallback(
     (imgUrl = null) => {
@@ -320,46 +342,46 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Get camera list
+  function selectDefaultCamera(devices) {
+    const backCam = devices.find(cam =>
+      cam.label.toLowerCase().includes("back") ||
+      cam.label.toLowerCase().includes("rear") ||
+      cam.label.toLowerCase().includes("Rück")
+    );
+    if (cameraSelectorRef.current) {
+      cameraSelectorRef.current.value = backCam
+        ? backCam.deviceId
+        : devices[0]?.deviceId || "";
+    }
+  }
+
   const getCameras = useCallback(async () => {
     try {
-      // get camera list
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(
-        (device) => device.kind === "videoinput"
-      );
+      let videoDevices = devices.filter(d => d.kind === "videoinput");
 
-      // if no labels, try request permission to get labels
       if (videoDevices.length > 0 && !videoDevices[0].label) {
         try {
-          const tempStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
-          tempStream.getTracks().forEach((track) => track.stop());
-
-          const updatedDevices =
-            await navigator.mediaDevices.enumerateDevices();
-          const updatedVideoDevices = updatedDevices.filter(
-            (device) => device.kind === "videoinput"
-          );
-
-          setCameras(updatedVideoDevices);
-          return updatedVideoDevices;
+          const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          tempStream.getTracks().forEach(track => track.stop());
+          const updatedDevices = await navigator.mediaDevices.enumerateDevices();
+          videoDevices = updatedDevices.filter(d => d.kind === "videoinput");
         } catch (err) {
           console.error("Error getting camera permissions:", err);
-          setCameras(videoDevices);
-          return videoDevices;
         }
-      } else {
-        setCameras(videoDevices);
-        return videoDevices;
       }
+
+      setCameras(videoDevices);
+      selectDefaultCamera(videoDevices);
+      return videoDevices;
     } catch (err) {
       console.error("Error enumerating devices:", err);
       setCameras([]);
+      if (cameraSelectorRef.current) cameraSelectorRef.current.value = "";
       return [];
     }
   }, []);
+
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
@@ -377,12 +399,12 @@ const loadModel = useCallback(async () => {
       try {
         setProcessingStatus((prev) => ({
           ...prev,
-          statusMsg: "Getting camera list...",
+          statusMsg: "Kameraliste auslesen...",
           statusColor: "blue",
         }));
         const currentCameras = await getCameras();
         if (currentCameras.length === 0) {
-          throw new Error("No available camera devices found");
+          throw new Error("keine Kameras gefunden");
         }
 
         setProcessingStatus((prev) => ({
@@ -393,7 +415,20 @@ const loadModel = useCallback(async () => {
 
         const selectedDeviceId = cameraSelectorRef.current
           ? cameraSelectorRef.current.value
-          : currentCameras[0].deviceId;
+          : (() => {
+              // Suche nach Rückkamera
+              const backCam = currentCameras.find(cam =>
+                cam.label.toLowerCase().includes("back") ||
+                cam.label.toLowerCase().includes("rear") ||
+                cam.label.toLowerCase().includes("Rück")
+              );
+              return backCam ? backCam.deviceId : currentCameras[0].deviceId;
+            })();
+
+
+        // const selectedDeviceId = cameraSelectorRef.current
+        //   ? cameraSelectorRef.current.value
+        //   : currentCameras[0].deviceId;
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -411,7 +446,7 @@ const loadModel = useCallback(async () => {
             statusColor: "green",
           }));
         } catch (streamErr) {
-          console.error("Failed to open selected camera:", streamErr);
+          console.error("Fehler beim öffnen der Kamera:", streamErr);
 
           setProcessingStatus((prev) => ({
             ...prev,
@@ -511,8 +546,22 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Button Upload Video
-  const handle_OpenVideo = useCallback((file) => {
+  const handle_OpenVideo = useCallback( async (file) => {
     if (file) {
+  
+      // Worker ggf. neu starten -> vorher beenden
+      if (videoWorkerRef.current) {
+        console.log("Beende alten Video Worker");
+        videoWorkerRef.current.postMessage({ type: "cleanup" });
+        // videoWorkerRef.current.terminate();
+      }
+      const videoWorker = new Worker(
+        new URL("./utils/video_process_worker.js", import.meta.url),
+        { type: "module" }
+      );
+      videoWorker.onmessage = videoWorkerMessage;
+      videoWorkerRef.current = videoWorker;
+      console.log("Starte Video Worker aus main thread");
       videoWorkerRef.current.postMessage(
         {
           file: file,
@@ -524,16 +573,15 @@ const loadModel = useCallback(async () => {
     } else {
       setActiveFeature(null);
     }
-  }, []);
+  }, [videoWorkerMessage]);
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
-        <span className="block sm:inline">Tiedemanns</span>
+        <span className="block sm:inline"></span>
         <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
           {" "}
-          Heidelbeer-Detektor {appVersion}
-
+          Smart Fruit Finder {appVersion}
         </span>
       </h1>
       <ImageDisplay
@@ -541,10 +589,12 @@ const loadModel = useCallback(async () => {
         imgRef={imgRef}
         overlayRef={overlayRef}
         imgSrc={imgSrc}
+        videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoad}
+        // onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
         activeFeature={activeFeature}
-      />
+      />      
       <ControlButtons
         imgSrc={imgSrc}
         fileVideoRef={fileVideoRef}
@@ -554,7 +604,9 @@ const loadModel = useCallback(async () => {
         handle_ToggleCamera={handle_ToggleCamera}
         handle_AddModel={handle_AddModel}
         handle_AddClassesFile={handle_AddClassesFile}
+        handle_CloseVideo={handle_CloseVideo}
         activeFeature={activeFeature}
+        isiPhoneSe={isIPhoneSE}
       />
       <ResultsTable
         details={details}

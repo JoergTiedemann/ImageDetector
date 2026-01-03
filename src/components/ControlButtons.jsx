@@ -11,8 +11,11 @@ const ControlButtons = memo(function ControlButtons({
   handle_ToggleCamera,
   handle_AddModel,
   handle_AddClassesFile,
+  handle_CloseVideo,
+  isiPhoneSe,
   activeFeature,
 }) {
+  console.log("isiPhoneSe in ControlButtons:", isiPhoneSe);
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -29,29 +32,57 @@ const ControlButtons = memo(function ControlButtons({
             }
           }}
         />
-
+        {!isiPhoneSe && (
         <button
-          className="btn-primary flex items-center justify-center text-sm sm:text-base"
-          onClick={() => fileVideoRef.current.click()}
-          disabled={activeFeature !== null}
+          className={`${
+            activeFeature === "processedVideo" ? "btn-danger" : "btn-primary"
+          } flex items-center justify-center text-sm sm:text-base`}
+          onClick={() =>
+            activeFeature === "processedVideo"
+              ? handle_CloseVideo()
+              : fileVideoRef.current.click()
+          }
+          disabled={activeFeature !== null && activeFeature !== "processedVideo"}
         >
-          <svg
-            className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-            />
-          </svg>
-          <span className="truncate">Video öffnen</span>
+          {activeFeature === "processedVideo" ? (
+            <>
+              <svg
+                className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Video schließen
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+              Video öffnen
+            </>
+          )}
         </button>
-
+        )}
         <input
           type="file"
           accept="image/*"

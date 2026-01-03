@@ -1,11 +1,9 @@
 import React, { memo } from "react";
-import berry  from "../utils/berry_classes.json";
+import berry from "../utils/berry_classes.json";
 
 const modelClassMap = {
   berry2k_100: "berry",
-  berry2k_50: "berry",
-  best78: "berry",
-  berry9k_Epoch8: "berry",
+  berry9k_Epoch100: "berry9k",
   yolo11n: "default",
   yolo11s: "default",
   yolo12n: "default",
@@ -80,7 +78,7 @@ const SettingsPanel = memo(function SettingsPanel({
 
               <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
-                  KI-Modell:
+                  Objektauswahl:
                 </label>
                 <select
                   name="model-selector"
@@ -90,13 +88,19 @@ const SettingsPanel = memo(function SettingsPanel({
                       modelConfigRef.current.model = selectedModel;
 
                       // Klassen automatisch setzen
+                      // console.log("selectedModel:", selectedModel);
                       const mappedClass = modelClassMap[selectedModel];
+                      // console.log("mappedClass:", mappedClass," modelClassMap:", modelClassMap);
+                      // console.log("berry9kclasses:", berry.berry9k);
                       if (mappedClass === "default") {
                         modelConfigRef.current.classes = defaultClasses;
                         classFileSelectedRef.current.value = "default";
                       } else if (mappedClass === "berry") {
                         modelConfigRef.current.classes = { classes: [...berry.berry] };
                         classFileSelectedRef.current.value = "berry";
+                      } else if (mappedClass === "berry9k") {
+                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                        classFileSelectedRef.current.value = "berry9k";
                       }
 
                       // Falls du auch Custom-Modelle mit eigenen Klassen hast:
@@ -114,13 +118,11 @@ const SettingsPanel = memo(function SettingsPanel({
                   disabled={activeFeature !== null}
                   className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
                 >
-                  <option value="berry2k_100">Blaubeeren (2Tsd Bilder,100 Epochen,12MB)</option>
-                  <option value="berry2k_50">Blaubeeren (2Tsd Bilder,50 Epochen,12MB)</option>
-                  <option value="best78">Blaubeeren (78 Bilder,12MB)</option>
-                  <option value="berry9k_Epoch8">Blaubeeren (9Tsd Bilder,8 Epochen,18MB)</option>
-                  <option value="yolo11n">YOLO11n (2.6M)</option>
-                  <option value="yolo11s">YOLO11s (9.4M)</option>
-                  <option value="yolo12n">YOLO12n (2.6M)</option>
+                  <option value="berry9k_Epoch100">Blaubeeren</option>
+                  <option value="berry2k_100">Blaubeeren + Blüten</option>
+                  <option value="yolo11n">allgemeine Objekte (2.6M)</option>
+                  {/* <option value="yolo11s">YOLO11s (9.4M)</option>
+                  <option value="yolo12n">YOLO12n (2.6M)</option> */}
                   {customModels.map((model, index) => (
                     <option key={index} value={model.url}>
                       {model.name}
@@ -129,7 +131,7 @@ const SettingsPanel = memo(function SettingsPanel({
                 </select>
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col" hidden>
                 <label className="text-gray-300 mb-1 text-sm font-medium">
                   Klassen:
                 </label>
@@ -141,6 +143,7 @@ const SettingsPanel = memo(function SettingsPanel({
                       const mappedClass = modelClassMap[modelConfigRef.current.model];
                       if (mappedClass === "default") return "default";
                       if (mappedClass === "berry") return "berry";
+                      if (mappedClass === "berry9k") return "berry9k";
                       // falls Custom-Model → Index als String
                       const customIndex = customModels.findIndex(
                         m => m.url === modelConfigRef.current.model
@@ -154,15 +157,18 @@ const SettingsPanel = memo(function SettingsPanel({
                       modelConfigRef.current.classes = defaultClasses;
                     } else if (e.target.value === "berry") {
                       modelConfigRef.current.classes = { classes: [...berry.berry] };
+                    } else if (e.target.value === "berry9k") {
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
                     } else {
                       const selectedIndex = parseInt(e.target.value);
                       modelConfigRef.current.classes = customClasses[selectedIndex].data;
                     }
-                    console.log("modelConfigRef.current.classes:", modelConfigRef.current.classes);
+                    // console.log("modelConfigRef.current.classes:", modelConfigRef.current.classes);
                   }}
                   className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
                 >
-                  <option value="berry">Blaubeeren</option>
+                  <option value="berry9k">Blaubeeren</option>
+                  <option value="berry">Blaubeeren+Blüten</option>
                   <option value="default">Default Classes (COCO)</option>
                   {customClasses.map((classFile, index) => (
                     <option key={index} value={index}>
