@@ -28,6 +28,33 @@ export async function render_overlay(
   );
 }
 
+export function render_overlaytracked(tracked, ctx, classes) {
+  if (!tracked || tracked.length === 0) return;
+
+  ctx.lineWidth = 2;
+
+  tracked.forEach(obj => {
+    const [x, y, w, h] = obj.bbox;   // Array entpacken
+    const { id, class_idx } = obj;
+
+    // Bounding Box zeichnen
+    ctx.strokeStyle = "lime";
+    ctx.strokeRect(x, y, w, h);
+
+    // Label: stabile ID + Klassenname
+    const className = classes.classes?.[class_idx] ?? `Class ${class_idx}`;
+    const label = `B${id} - ${className}`;
+
+    ctx.fillStyle = "lime";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText(label, x, y - 4);
+  });
+}
+
+
+
+
+
 /**
  * Draw object detection results
  */

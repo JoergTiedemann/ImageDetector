@@ -2,7 +2,10 @@ import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
-import { render_overlay } from "./utils/render_overlay";
+import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
+import { computeBerryEmbedding } from "./tracking/BerryReID";
+import { BerryMatcher } from "./tracking/BerryMatcher";
+
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
 import packageJson from "../package.json"; // Pfad anpassen!
@@ -75,7 +78,11 @@ function App() {
   // Worker
   const videoWorkerRef = useRef(null);
 
-  // Init page
+  // Tracking
+  const berriesRef = useRef(new BerryMatcher());
+  const frameIndexRef = useRef(0);
+
+// Init page
   useEffect(() => {
     loadModel();
 
@@ -332,6 +339,7 @@ const loadModel = useCallback(async () => {
       );
 
       setDetails(results.bbox_results);
+
       setProcessingStatus((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,
@@ -522,19 +530,54 @@ const loadModel = useCallback(async () => {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
-      render_overlay(
-        results,
-        overlayCtx,
-        modelConfigRef.current.classes
-      );
+      //nicht bei Tracking
       // render_overlay(
       //   results,
-      //   modelConfigRef.current.task,
       //   overlayCtx,
       //   modelConfigRef.current.classes
       // );
+      //setDetails(results.bbox_results);
 
-      setDetails(results.bbox_results);
+      //Hier nun das Tracking 
+      frameIndexRef.current += 1;
+      const frameIndex = frameIndexRef.current;
+      const berries = berriesRef.current;
+      const tracked = [];
+      for (const det of results.bbox_results) {
+        if (det.score < 0.3) continue;
+
+        const embedding = computeBerryEmbedding(ctx, det);
+        const id = berries.match(
+          det,
+          embedding,
+          frameIndex,
+          ctx.canvas.width,
+          ctx.canvas.height
+        );
+
+        // console.log(
+        //   "Frame:", frameIndex,
+        //   "Det:", det.bbox,
+        //   "Assigned ID:", id
+        // );
+
+
+        tracked.push({
+          ...det,
+          id,
+          imageWidth: ctx.canvas.width,   // oder cameraRef.current.videoWidth
+          imageHeight: ctx.canvas.height  // oder cameraRef.current.videoHeight
+        });
+      }
+      // console.log("getrackte Beeren:", tracked);
+  
+      render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+      setDetails({
+        frameDetections: tracked,
+        uniqueBerryCount: berries.items.length,
+        globalBerries: berries.items   // <- neu
+      });
+
       setProcessingStatus((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,
