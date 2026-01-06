@@ -3,14 +3,16 @@ import { memo } from "react";
 const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
   const detections = details?.frameDetections || [];
   const uniqueCount = details?.uniqueBerryCount ?? 0;
-  const globalBerries = details?.globalBerries || []; // <- neu
+  const globalBerries = details?.globalBerryInfo || []; // <- neu
 
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <details className="text-gray-200 group">
         <summary className="flex items-center cursor-pointer select-none">
           <div className="flex-1 text-lg sm:text-xl font-bold border-b border-gray-700 pb-2">
-            Erkennungsergebnisse – Frame ({detections.length}) / Gesamt ({uniqueCount})
+          {globalBerries.classMap?.size !== undefined
+          ? `Gesamtzanzahl Beeren: ${globalBerries.total}`
+          : `Erkennungsergebnisse – Aktuell (${detections.length}) / Gesamt (${uniqueCount})`}
           </div>
           <div className="text-gray-400">
             <svg
@@ -32,6 +34,8 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
 
         <div className="transition-all duration-300 ease-in-out transform origin-top group-open:animate-details-show mt-3 sm:mt-4">
           {/* Frame-Detektionen */}
+          {globalBerries.classMap?.size === undefined && (
+          <>
           <h3 className="text-gray-300 font-semibold mb-2">Aktueller Frame</h3>
           {detections.length === 0 ? (
             <div className="bg-gray-700 rounded-lg p-4 text-center mb-4">
@@ -41,8 +45,8 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
             <div className="overflow-x-auto -mx-3 px-3 mb-6">
               <table className="w-full border-collapse min-w-full">
                 <thead>
-                  <tr className="bg-gray-700 text-left">
-                    <th className="p-2 text-xs sm:text-sm">ID</th>
+                  <tr className="bg-gray-700 text-center">
+                    <th className="p-2 text-xs sm:text-sm">uID</th>
                     <th className="p-2 text-xs sm:text-sm">Typ</th>
                     <th className="p-2 text-xs sm:text-sm">Wahrscheinlichkeit</th>
                   </tr>
@@ -51,11 +55,11 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
                   {detections.map((item, index) => (
                     <tr
                       key={index}
-                      className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300"
+                      className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300 text-center"
                     >
-                      <td className="p-2 font-mono text-xs sm:text-sm">{item.id ?? index}</td>
+                      <td className="p-2 font-mono text-xs sm:text-sm">{item.id ?? -99}</td>
                       <td className="p-2 text-xs sm:text-sm">
-                        {currentClasses[item.classId] || `Class ${item.classId}`}
+                        {currentClasses[item.class_idx] || `Class ${item.class_idx}`}
                       </td>
                       <td className="p-2 text-xs sm:text-sm">
                         {(item.score * 100).toFixed(1)}%
@@ -66,37 +70,33 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
               </table>
             </div>
           )}
-
+          </>)}
           {/* Globale Beerenliste */}
-          <h3 className="text-gray-300 font-semibold mb-2">Globale Beerenliste</h3>
-          {globalBerries.length === 0 ? (
-            <div className="bg-gray-700 rounded-lg p-4 text-center">
-              <p className="text-gray-400">Noch keine Beeren gesammelt</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto -mx-3 px-3">
-              <table className="w-full border-collapse min-w-full">
-                <thead>
-                  <tr className="bg-gray-700 text-left">
-                    <th className="p-2 text-xs sm:text-sm">ID</th>
-                    <th className="p-2 text-xs sm:text-sm">Frames gesehen</th>
-                    <th className="p-2 text-xs sm:text-sm">Letzter Frame</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {globalBerries.map((berry) => (
-                    <tr
-                      key={berry.id}
-                      className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300"
-                    >
-                      <td className="p-2 font-mono text-xs sm:text-sm">{berry.id}</td>
-                      <td className="p-2 text-xs sm:text-sm">{berry.seenCount}</td>
-                      <td className="p-2 text-xs sm:text-sm">{berry.lastSeenFrame}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {globalBerries.classMap?.size !== undefined && (
+            <>
+              <h3 className="text-gray-300 font-semibold mb-2">Globale Beerenliste</h3>
+                <div className="overflow-x-auto -mx-3 px-3">
+                  <table className="w-full border-collapse min-w-full">
+                    <thead>
+                      <tr className="bg-gray-700 text-center">
+                        <th className="p-2 text-xs sm:text-sm">Typ</th>
+                        <th className="p-2 text-xs sm:text-sm">Anzahl</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* {console.log("Global Berries size:", globalBerries.classMap.size, " Inhalt:", globalBerries)} */}
+                      {Array.from(globalBerries.classMap.entries()).map(([classIdx, count]) => (
+                        <tr key={classIdx}>
+                          <td className="p-2 font-mono text-xs sm:text-sm">
+                            {currentClasses[classIdx] || `Class ${classIdx}`}
+                          </td>
+                          <td className="p-2 text-xs sm:text-sm">{count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            </>
           )}
         </div>
       </details>

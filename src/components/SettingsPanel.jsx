@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { useEffect, useRef, memo } from "react";
 import berry from "../utils/berry_classes.json";
 
 const modelClassMap = {
@@ -8,6 +8,8 @@ const modelClassMap = {
   yolo11s: "default",
   yolo12n: "default",
 };
+
+
 
 
 const SettingsPanel = memo(function SettingsPanel({
@@ -23,7 +25,36 @@ const SettingsPanel = memo(function SettingsPanel({
   loadModel,
   activeFeature,
   defaultClasses,
-}) {
+})
+{
+ const firstCameraInitDone = useRef(false);
+  /*
+  diese hier brauchen wir um beim ersten Aufruf die Rückkamera (falls vorhanden) auszuwählen
+  */
+  useEffect(() => {
+    if (
+      !firstCameraInitDone.current &&
+      cameras.length > 0 &&
+      cameraSelectorRef.current
+    ) {
+      const backCam = cameras.find(cam =>
+        cam.label.toLowerCase().includes("back") ||
+        cam.label.toLowerCase().includes("rear") ||
+        cam.label.toLowerCase().includes("rück")
+      );
+
+      if (backCam) {
+        cameraSelectorRef.current.value = backCam.deviceId;
+        console.log("Rückkamera vorausgewählt:", backCam.deviceId);
+      } else {
+        cameraSelectorRef.current.value = cameras[0].deviceId;
+        console.log("Fallback auf erste Kamera:", cameras[0].deviceId);
+      }
+
+      firstCameraInitDone.current = true;
+    }
+  }, [cameras, cameraSelectorRef]);
+
   return (
     <div
       id="setting-container"

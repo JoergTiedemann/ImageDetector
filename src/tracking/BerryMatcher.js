@@ -4,42 +4,49 @@ export class BerryMatcher {
   constructor() {
     this.items = [];
     this.nextId = 1;
+    this.usedIds = new Set(); // Frame-lokale Sperre
+  }
+
+  // Am Anfang jedes Frames aufrufen
+  resetFrame() {
+    this.usedIds.clear();
   }
 
   match(detection, embedding, frameIndex, imageWidth, imageHeight) {
-    const maxFrameGap = 200;
     const maxEmbDist = 0.4;
     const maxPosDist = 0.2;
-
     const diag = Math.hypot(imageWidth, imageHeight);
 
     let best = null;
     let bestScore = Infinity;
 
     for (const berry of this.items) {
-      if (frameIndex - berry.lastSeenFrame > maxFrameGap) continue;
+      // Nur gleiche Klasse prüfen
+      if (berry.class_idx !== detection.class_idx) continue;
 
-      // Embedding-Distanz robust berechnen
-      const eDist = embeddingDistance(
-        sanitizeEmbedding(embedding),
-        sanitizeEmbedding(berry.embedding)
-      );
+      // ID darf in diesem Frame nicht schon vergeben sein
+      if (this.usedIds.has(berry.id)) continue;
 
-      // Positions-Distanz robust berechnen
+      // Embedding-Distanz gegen alle gespeicherten Embeddings dieser Beere
+      let minEDist = Infinity;
+      for (const emb of berry.embeddings) {
+        const eDist = embeddingDistance(
+          sanitizeEmbedding(embedding),
+          sanitizeEmbedding(emb)
+        );
+        if (Number.isFinite(eDist)) {
+          minEDist = Math.min(minEDist, eDist);
+        }
+      }
+
+      // Positions-Distanz
       const pDist = bboxDistance(detection.bbox, berry.lastBBox) / diag;
 
-      console.log(
-        "Vergleich mit Beere", berry.id,
-        "eDist:", eDist.toFixed(3),
-        "pDist:", pDist.toFixed(3),
-        "Score:", (eDist + pDist).toFixed(3)
-      );
-
-      if (!Number.isFinite(eDist) || !Number.isFinite(pDist)) continue;
-      if (eDist > maxEmbDist) continue;
+      if (!Number.isFinite(minEDist) || !Number.isFinite(pDist)) continue;
+      if (minEDist > maxEmbDist) continue;
       if (pDist > maxPosDist) continue;
 
-      const score = eDist + pDist;
+      const score = minEDist + pDist;
       if (score < bestScore) {
         bestScore = score;
         best = berry;
@@ -48,8 +55,8 @@ export class BerryMatcher {
 
     if (best) {
       // bestehende Beere → aktualisieren
-      best.embedding = sanitizeEmbedding(embedding);
-      best.lastBBox = detection.bbox;   // Array [x,y,w,h]
+      best.embeddings.push(sanitizeEmbedding(embedding));
+      best.lastBBox = detection.bbox;
       best.lastSeenFrame = frameIndex;
       best.seenCount += 1;
       best.class_idx = detection.class_idx;
@@ -59,14 +66,15 @@ export class BerryMatcher {
         w: detection.bbox[2],
         h: detection.bbox[3]
       });
+      this.usedIds.add(best.id); // ID für diesen Frame sperren
       return best.id;
     } else {
       // neue Beere → neue ID vergeben
       const id = this.nextId++;
-      this.items.push({
+      const newBerry = {
         id,
-        embedding: sanitizeEmbedding(embedding),
-        lastBBox: detection.bbox,   // Array [x,y,w,h]
+        embeddings: [sanitizeEmbedding(embedding)],
+        lastBBox: detection.bbox,
         lastSeenFrame: frameIndex,
         seenCount: 1,
         class_idx: detection.class_idx,
@@ -76,16 +84,16 @@ export class BerryMatcher {
           detection.bbox[2],
           detection.bbox[3]
         )
-      });
+      };
+      this.items.push(newBerry);
+      this.usedIds.add(id); // ID für diesen Frame sperren
       return id;
     }
   }
 }
 
-// Hilfsfunktionen
-
+// Hilfsfunktionen bleiben gleich
 function sanitizeEmbedding(embedding) {
-  // ersetze NaN/Infinity durch 0
   return Array.from(embedding).map(v => (Number.isFinite(v) ? v : 0));
 }
 
@@ -102,11 +110,25 @@ function embeddingDistance(a, b) {
 function bboxDistance(detBBox, refBBox) {
   const [ax, ay, aw, ah] = detBBox;
   const [bx, by, bw, bh] = refBBox;
-
   const ca = { cx: ax + aw / 2, cy: ay + ah / 2 };
   const cb = { cx: bx + bw / 2, cy: by + bh / 2 };
-
   const dx = ca.cx - cb.cx;
   const dy = ca.cy - cb.cy;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+export function countBerriesByClass(berries) {
+  const classMap = new Map();
+  let total = 0;
+
+  for (const berry of berries.items) {
+    const idx = berry.class_idx;
+    classMap.set(idx, (classMap.get(idx) || 0) + 1);
+    total++;
+  }
+
+  return {
+    classMap,
+    total,
+  };
 }
