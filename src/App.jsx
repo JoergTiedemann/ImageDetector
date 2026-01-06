@@ -2,7 +2,10 @@ import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
-import { render_overlay } from "./utils/render_overlay";
+import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
+import { computeBerryEmbedding } from "./tracking/BerryReID";
+import { BerryMatcher,countBerriesByClass,countBerryArrayByClass } from "./tracking/BerryMatcher";
+
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
 import packageJson from "../package.json"; // Pfad anpassen!
@@ -57,6 +60,8 @@ function App() {
   const cameraRef = useRef(null);
   const fileImageRef = useRef(null);
   const fileVideoRef = useRef(null);
+  const isCameraActiveRef = useRef(false);
+  const firstCameraInitDone = useRef(false); // außerhalb von getCameras, z. B. im Component Body
 
   // state
   const [customModels, setCustomModels] = useState([]);
@@ -75,7 +80,11 @@ function App() {
   // Worker
   const videoWorkerRef = useRef(null);
 
-  // Init page
+  // Tracking
+  const berriesRef = useRef(new BerryMatcher());
+  const frameIndexRef = useRef(0);
+
+// Init page
   useEffect(() => {
     loadModel();
 
@@ -307,7 +316,7 @@ const loadModel = useCallback(async () => {
     // overlay size = image size
     overlayRef.current.width = imgRef.current.width;
     overlayRef.current.height = imgRef.current.height;
-
+    const tracked = [];
     // inference
     try {
       const [results, results_inferenceTime] = await inference_pipeline(
@@ -331,7 +340,28 @@ const loadModel = useCallback(async () => {
         modelConfigRef.current.classes
       );
 
-      setDetails(results.bbox_results);
+      // setDetails(results.bbox_results);
+      let id=0;
+      for (const det of results.bbox_results) {
+        id++;
+        console.log("Det:", det);
+         tracked.push({
+          ...det,
+          id,
+          imageWidth: overlayCtx.canvas.width,   // oder cameraRef.current.videoWidth
+          imageHeight: overlayCtx.canvas.height  // oder cameraRef.current.videoHeight
+        });
+      }
+
+      console.log("countBerryArrayByClass:",countBerryArrayByClass(results.bbox_results));
+
+      setDetails({
+        frameDetections: tracked,
+        uniqueBerryCount: tracked.length,
+        globalBerryInfo: countBerryArrayByClass(results.bbox_results)
+          });
+
+
       setProcessingStatus((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,
@@ -342,20 +372,13 @@ const loadModel = useCallback(async () => {
   }, [sessionRef.current]);
 
   // Get camera list
-  function selectDefaultCamera(devices) {
-    const backCam = devices.find(cam =>
-      cam.label.toLowerCase().includes("back") ||
-      cam.label.toLowerCase().includes("rear") ||
-      cam.label.toLowerCase().includes("Rück")
-    );
-    if (cameraSelectorRef.current) {
-      cameraSelectorRef.current.value = backCam
-        ? backCam.deviceId
-        : devices[0]?.deviceId || "";
-    }
-  }
-
   const getCameras = useCallback(async () => {
+    /*
+    hier wird beim ersten Aufruf versucht die Rückkamera zu wählen (sofern vorhanden).
+    Dazu wird geprüft, ob der Kameraname "back" oder "rear" oder "rück" enthält.
+    Wenn ja, wird diese Kamera als defaultDeviceId zurückgegeben.
+    Beim nächsten Aufruf wird die zuletzt ausgewählte Kamera verwendet und als defaultDeviceId zurückgegeben.
+    */
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       let videoDevices = devices.filter(d => d.kind === "videoinput");
@@ -372,16 +395,30 @@ const loadModel = useCallback(async () => {
       }
 
       setCameras(videoDevices);
-      selectDefaultCamera(videoDevices);
-      return videoDevices;
+
+      let defaultDeviceId = "";
+
+      if (!firstCameraInitDone.current) {
+        const backCam = videoDevices.find(cam =>
+          cam.label.toLowerCase().includes("back") ||
+          cam.label.toLowerCase().includes("rear") ||
+          cam.label.toLowerCase().includes("rück")
+        );
+        defaultDeviceId = backCam?.deviceId || videoDevices[0]?.deviceId || "";
+        firstCameraInitDone.current = true;
+        console.log("Rückkamera beim ersten Mal gewählt:", defaultDeviceId);
+      } else if (cameraSelectorRef.current) {
+        defaultDeviceId = cameraSelectorRef.current.value || "";
+        console.log("Bestehende Kameraauswahl übernommen:", defaultDeviceId);
+      }
+
+      return { devices: videoDevices, defaultDeviceId };
     } catch (err) {
       console.error("Error enumerating devices:", err);
       setCameras([]);
-      if (cameraSelectorRef.current) cameraSelectorRef.current.value = "";
-      return [];
+      return { devices: [], defaultDeviceId: "" };
     }
   }, []);
-
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
@@ -391,19 +428,32 @@ const loadModel = useCallback(async () => {
       cameraRef.current.srcObject = null;
       overlayRef.current.width = 0;
       overlayRef.current.height = 0;
+      isCameraActiveRef.current = false;
 
-      setDetails([]);
+      // const result = countBerriesByClass(berriesRef.current);
+      // console.log("Endergebnis:", result);
+      // Ausgabe: { unreif: X, mittelreif: Y, reif: Z }
+      setDetails({
+        // frameDetections: tracked,
+        // uniqueBerryCount: berries.items.length,
+        globalBerryInfo: countBerriesByClass(berriesRef.current)   // <- neu
+      });
+      // setDetails([]);
       setActiveFeature(null);
     } else {
       // open camera
+      //erstmal alle bisherigen getrackten Beeren löschen
+      berriesRef.current.items = [];
+      berriesRef.current.nextId = 1;
+      isCameraActiveRef.current = true;
       try {
         setProcessingStatus((prev) => ({
           ...prev,
           statusMsg: "Kameraliste auslesen...",
           statusColor: "blue",
         }));
-        const currentCameras = await getCameras();
-        if (currentCameras.length === 0) {
+        const { devices, defaultDeviceId } = await getCameras();
+        if (devices.length === 0) {
           throw new Error("keine Kameras gefunden");
         }
 
@@ -414,21 +464,20 @@ const loadModel = useCallback(async () => {
         }));
 
         const selectedDeviceId = cameraSelectorRef.current
-          ? cameraSelectorRef.current.value
-          : (() => {
-              // Suche nach Rückkamera
-              const backCam = currentCameras.find(cam =>
-                cam.label.toLowerCase().includes("back") ||
-                cam.label.toLowerCase().includes("rear") ||
-                cam.label.toLowerCase().includes("Rück")
-              );
-              return backCam ? backCam.deviceId : currentCameras[0].deviceId;
-            })();
+          ? cameraSelectorRef.current.value || defaultDeviceId
+          : defaultDeviceId;
 
 
         // const selectedDeviceId = cameraSelectorRef.current
         //   ? cameraSelectorRef.current.value
         //   : currentCameras[0].deviceId;
+
+          console.log("DeviceID:",selectedDeviceId);
+          setProcessingStatus((prev) => ({
+            ...prev,
+            statusMsg: `Kamera:${selectedDeviceId}...`,
+            statusColor: "green",
+          }));
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -499,6 +548,7 @@ const loadModel = useCallback(async () => {
         ctx = null;
         return;
       }
+      if (!isCameraActiveRef.current) return;
       // draw camera frame to input canvas
       ctx.drawImage(
         cameraRef.current,
@@ -522,19 +572,63 @@ const loadModel = useCallback(async () => {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
-      render_overlay(
-        results,
-        overlayCtx,
-        modelConfigRef.current.classes
-      );
+      //nicht bei Tracking
       // render_overlay(
       //   results,
-      //   modelConfigRef.current.task,
       //   overlayCtx,
       //   modelConfigRef.current.classes
       // );
+      //setDetails(results.bbox_results);
 
-      setDetails(results.bbox_results);
+      //Hier nun das Tracking 
+      frameIndexRef.current += 1;
+      const frameIndex = frameIndexRef.current;
+      const berries = berriesRef.current;
+      const tracked = [];
+      // Ids für diesen Frame zurücksetzen
+      berriesRef.current.resetFrame();
+
+      for (const det of results.bbox_results) {
+        if (det.score < 0.3) continue;
+
+        const embedding = computeBerryEmbedding(ctx, det);
+        const id = berries.match(
+          det,
+          embedding,
+          frameIndex,
+          ctx.canvas.width,
+          ctx.canvas.height
+        );
+
+        // console.log(
+        //   "Frame:", frameIndex,
+        //   "Det:", det.bbox,
+        //   "Assigned ID:", id
+        // );
+
+
+        tracked.push({
+          ...det,
+          id,
+          imageWidth: ctx.canvas.width,   // oder cameraRef.current.videoWidth
+          imageHeight: ctx.canvas.height  // oder cameraRef.current.videoHeight
+        });
+      }
+
+      // console.log("isCameraActiveRef:",isCameraActiveRef.current);
+
+      if (isCameraActiveRef.current)
+      {
+          // if (activeFeature !== "camera") return; // Abbrechen, wenn Kamera geschlossen wurde
+          // console.log("getrackte Beeren:", tracked);
+      
+          render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+          setDetails({
+            frameDetections: tracked,
+            uniqueBerryCount: berries.items.length,
+            // globalBerries: berries.items   // <- neu
+          });
+      }
       setProcessingStatus((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,

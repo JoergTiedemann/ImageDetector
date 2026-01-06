@@ -15,7 +15,7 @@ const ControlButtons = memo(function ControlButtons({
   isiPhoneSe,
   activeFeature,
 }) {
-  console.log("isiPhoneSe in ControlButtons:", isiPhoneSe);
+  // console.log("isiPhoneSe in ControlButtons:", isiPhoneSe);
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
