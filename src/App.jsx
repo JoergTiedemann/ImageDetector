@@ -4,7 +4,7 @@ import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./u
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
 import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { BerryMatcher,countBerriesByClass } from "./tracking/BerryMatcher";
+import { BerryMatcher,countBerriesByClass,countBerryArrayByClass } from "./tracking/BerryMatcher";
 
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
@@ -316,7 +316,7 @@ const loadModel = useCallback(async () => {
     // overlay size = image size
     overlayRef.current.width = imgRef.current.width;
     overlayRef.current.height = imgRef.current.height;
-
+    const tracked = [];
     // inference
     try {
       const [results, results_inferenceTime] = await inference_pipeline(
@@ -340,7 +340,27 @@ const loadModel = useCallback(async () => {
         modelConfigRef.current.classes
       );
 
-      setDetails(results.bbox_results);
+      // setDetails(results.bbox_results);
+      let id=0;
+      for (const det of results.bbox_results) {
+        id++;
+        console.log("Det:", det);
+         tracked.push({
+          ...det,
+          id,
+          imageWidth: overlayCtx.canvas.width,   // oder cameraRef.current.videoWidth
+          imageHeight: overlayCtx.canvas.height  // oder cameraRef.current.videoHeight
+        });
+      }
+
+      console.log("countBerryArrayByClass:",countBerryArrayByClass(results.bbox_results));
+
+      setDetails({
+        frameDetections: tracked,
+        uniqueBerryCount: tracked.length,
+        globalBerryInfo: countBerryArrayByClass(results.bbox_results)
+          });
+
 
       setProcessingStatus((prev) => ({
         ...prev,
@@ -399,11 +419,6 @@ const loadModel = useCallback(async () => {
       return { devices: [], defaultDeviceId: "" };
     }
   }, []);
-
-
-
-
-
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {

@@ -34,7 +34,7 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
 
         <div className="transition-all duration-300 ease-in-out transform origin-top group-open:animate-details-show mt-3 sm:mt-4">
           {/* Frame-Detektionen */}
-          {globalBerries.classMap?.size === undefined && (
+          {details.frameDetections !== undefined && (
           <>
           <h3 className="text-gray-300 font-semibold mb-2">Aktueller Frame</h3>
           {detections.length === 0 ? (
@@ -46,7 +46,7 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
               <table className="w-full border-collapse min-w-full">
                 <thead>
                   <tr className="bg-gray-700 text-center">
-                    <th className="p-2 text-xs sm:text-sm">uID</th>
+                    <th className="p-2 text-xs sm:text-sm">ID</th>
                     <th className="p-2 text-xs sm:text-sm">Typ</th>
                     <th className="p-2 text-xs sm:text-sm">Wahrscheinlichkeit</th>
                   </tr>

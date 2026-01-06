@@ -52,9 +52,6 @@ export function render_overlaytracked(tracked, ctx, classes) {
 }
 
 
-
-
-
 /**
  * Draw object detection results
  */
