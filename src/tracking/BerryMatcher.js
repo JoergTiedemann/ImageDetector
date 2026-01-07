@@ -1,58 +1,79 @@
-import { SimpleKalman } from "./SimpleKalman";
+import { SimpleKalman } from "./SimpleKalman.js";
 
 export class BerryMatcher {
   constructor() {
     this.items = [];
     this.nextId = 1;
-    this.usedIds = new Set(); // Frame-lokale Sperre
+    this.usedIds = new Set();
+
+    this.avgEDist = 0.20;
+    this.alpha = 0.05;
+    this.MAX_EMBEDDINGS = 15;// war urspruenglich 5
   }
 
-  // Am Anfang jedes Frames aufrufen
   resetFrame() {
     this.usedIds.clear();
   }
 
+  // Hilfsfunktion: YOLO → Pixel
+  toPixelBBox(bbox, imageWidth, imageHeight) {
+    const [bx, by, bw, bh] = bbox;
+
+    // Wenn Werte <= 1 sind → normalisiert
+    if (bx <= 1 && by <= 1 && bw <= 1 && bh <= 1) {
+      return [
+        bx * imageWidth,
+        by * imageHeight,
+        bw * imageWidth,
+        bh * imageHeight
+      ];
+    }
+
+    // Sonst Pixel
+    return [bx, by, bw, bh];
+  }
+
   match(detection, embedding, frameIndex, imageWidth, imageHeight) {
-    const maxEmbDist = 0.4;
-    const maxPosDist = 0.2;
+
+    // ---------------------------------------------------------
+    // FIX 3: Kalman-Prediction für alle existierenden Beeren
+    // ---------------------------------------------------------
+    for (const berry of this.items) {
+      berry.kf.predict();
+    }
+
+    const detBBoxPx = this.toPixelBBox(detection.bbox, imageWidth, imageHeight);
+
+    const maxEmbDist = Math.min(0.6, Math.max(0.15, this.avgEDist * 2.5));
+    // const maxPosDist = Math.min(0.3, Math.max(0.05, this.avgEDist * 1.2));
+    const maxPosDist = 0.5;  // robust gegen YOLO-Jitter
+
     const diag = Math.hypot(imageWidth, imageHeight);
 
     let best = null;
     let bestScore = Infinity;
     let minEDist = Infinity;
-    let pDist = Infinity; 
-// debugEmbeddingASCII(embedding);
-// debugEmbeddingStats(embedding);
-
+    let pDist = Infinity;
 
     for (const berry of this.items) {
-      // Nur gleiche Klasse prüfen
       if (berry.class_idx !== detection.class_idx) continue;
-
-      // ID darf in diesem Frame nicht schon vergeben sein
       if (this.usedIds.has(berry.id)) continue;
 
-      // Embedding-Distanz gegen alle gespeicherten Embeddings dieser Beere
+      // Embedding-Distanz
       minEDist = Infinity;
       for (const emb of berry.embeddings) {
         const eDist = embeddingDistance(
           sanitizeEmbedding(embedding),
           sanitizeEmbedding(emb)
         );
-
-// debugCompareEmbeddings(emb, embedding);
-
-
-        // console.log("Comparing embedding BerryID:", berry.id," length:", berry.embeddings, " embedding:",embedding," emb:",emb," eDist:", eDist);
         if (Number.isFinite(eDist)) {
           minEDist = Math.min(minEDist, eDist);
         }
       }
 
-      // Positions-Distanz
-      pDist = bboxDistance(detection.bbox, berry.lastBBox) / diag;
+      // Positionsdistanz (Pixel!)
+      pDist = bboxDistance(detBBoxPx, berry.lastBBox) / diag;
 
-      if (!Number.isFinite(minEDist) || !Number.isFinite(pDist)) continue;
       if (minEDist > maxEmbDist) continue;
       if (pDist > maxPosDist) continue;
 
@@ -63,56 +84,62 @@ export class BerryMatcher {
       }
     }
 
+    // MATCH
     if (best) {
-      // bestehende Beere → aktualisieren
+      this.avgEDist = this.avgEDist * (1 - this.alpha) + minEDist * this.alpha;
+
+      // if (minEDist < 0.15) {
+      //   best.embeddings.push(sanitizeEmbedding(embedding));
+      //   if (best.embeddings.length > this.MAX_EMBEDDINGS) {
+      //     best.embeddings.shift();
+      //   }
+      // }
+
       best.embeddings.push(sanitizeEmbedding(embedding));
-      best.lastBBox = detection.bbox;
+      if (best.embeddings.length > this.MAX_EMBEDDINGS) {
+          best.embeddings.shift();
+      }
+
+
+      best.lastBBox = detBBoxPx;
       best.lastSeenFrame = frameIndex;
       best.seenCount += 1;
-      best.eDist = minEDist
+      best.eDist = minEDist;
       best.pDist = pDist;
-      best.class_idx = detection.class_idx;
+
       best.kf.update({
-        x: detection.bbox[0],
-        y: detection.bbox[1],
-        w: detection.bbox[2],
-        h: detection.bbox[3]
+        x: detBBoxPx[0],
+        y: detBBoxPx[1],
+        w: detBBoxPx[2],
+        h: detBBoxPx[3]
       });
-      console.log("Matched BerryID:", best.id, " eDist:", best.eDist," embeddinglength:", best.embeddings.length);
-      this.usedIds.add(best.id); // ID für diesen Frame sperren
-      return {
-        id: best.id,
-        eDist: best.eDist,
-        pDist: best.pDist
-      };
-    } else {
-      // neue Beere → neue ID vergeben
-      const id = this.nextId++;
-      const newBerry = {
-        id,
-        embeddings: [sanitizeEmbedding(embedding)],
-        lastBBox: detection.bbox,
-        lastSeenFrame: frameIndex,
-        seenCount: 1,
-        eDist: -1,
-        pDist: -1,
-        class_idx: detection.class_idx,
-        kf: new SimpleKalman(
-          detection.bbox[0],
-          detection.bbox[1],
-          detection.bbox[2],
-          detection.bbox[3]
-        )
-      };
-      // console.log("New BerryID:", id, " eDist:", newBerry.eDist, " seenCount:", newBerry.seenCount);
-      this.items.push(newBerry);
-      this.usedIds.add(id); // ID für diesen Frame sperren
-      return {
-        id: id,
-        eDist: newBerry.eDist,
-        pDist: newBerry.pDist
-      };
+
+      this.usedIds.add(best.id);
+      return { id: best.id, eDist: minEDist, pDist };
     }
+
+    // NEUE BEERE
+    const id = this.nextId++;
+    const newBerry = {
+      id,
+      embeddings: [sanitizeEmbedding(embedding)],
+      lastBBox: detBBoxPx,
+      lastSeenFrame: frameIndex,
+      seenCount: 1,
+      eDist: -1,
+      pDist: -1,
+      class_idx: detection.class_idx,
+      kf: new SimpleKalman(
+        detBBoxPx[0],
+        detBBoxPx[1],
+        detBBoxPx[2],
+        detBBoxPx[3]
+      )
+    };
+
+    this.items.push(newBerry);
+    this.usedIds.add(id);
+    return { id, eDist: -1, pDist: -1 };
   }
 }
 
