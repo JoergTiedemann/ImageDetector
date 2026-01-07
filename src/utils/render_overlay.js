@@ -35,7 +35,7 @@ export function render_overlaytracked(tracked, ctx, classes) {
 
   tracked.forEach(obj => {
     const [x, y, w, h] = obj.bbox;   // Array entpacken
-    const { id, class_idx } = obj;
+    const { id, eDist, pDist, class_idx } = obj;
 
     // Bounding Box zeichnen
     ctx.strokeStyle = "lime";
@@ -43,7 +43,7 @@ export function render_overlaytracked(tracked, ctx, classes) {
 
     // Label: stabile ID + Klassenname
     const className = classes.classes?.[class_idx] ?? `Class ${class_idx}`;
-    const label = `B${id} - ${className}`;
+    const label = `B${id} - ${eDist.toFixed(2)}-${pDist.toFixed(2)}`;//${className}
 
     ctx.fillStyle = "lime";
     ctx.font = "14px system-ui, sans-serif";

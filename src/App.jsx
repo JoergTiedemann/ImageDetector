@@ -4,7 +4,7 @@ import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./u
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
 import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { BerryMatcher,countBerriesByClass,countBerryArrayByClass } from "./tracking/BerryMatcher";
+import { BerryMatcher,countBerriesByClass,countBerryArrayByClass,debugEmbeddingASCII,debugEmbeddingStats } from "./tracking/BerryMatcher";
 
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
@@ -590,9 +590,11 @@ const loadModel = useCallback(async () => {
 
       for (const det of results.bbox_results) {
         if (det.score < 0.3) continue;
-
         const embedding = computeBerryEmbedding(ctx, det);
-        const id = berries.match(
+// debugEmbeddingASCII(embedding);
+// debugEmbeddingStats(embedding);
+
+        const result  = berries.match(
           det,
           embedding,
           frameIndex,
@@ -609,7 +611,9 @@ const loadModel = useCallback(async () => {
 
         tracked.push({
           ...det,
-          id,
+          id:result.id,
+          eDist:result.eDist,
+          pDist:result.pDist,
           imageWidth: ctx.canvas.width,   // oder cameraRef.current.videoWidth
           imageHeight: ctx.canvas.height  // oder cameraRef.current.videoHeight
         });
