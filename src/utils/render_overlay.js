@@ -28,28 +28,55 @@ export async function render_overlay(
   );
 }
 
+function heatColor(value, max) {
+  const ratio = Math.min(value / max, 1);
+
+  if (ratio < 0.33) return "rgba(0, 200, 0, 0.9)";      // grün
+  if (ratio < 0.66) return "rgba(255, 165, 0, 0.9)";    // orange
+  return "rgba(255, 0, 0, 0.9)";                        // rot
+}
+
+
 export function render_overlaytracked(tracked, ctx, classes) {
   if (!tracked || tracked.length === 0) return;
 
   ctx.lineWidth = 2;
+  ctx.font = "14px Arial";
+  ctx.textBaseline = "top";
 
   tracked.forEach(obj => {
-    const [x, y, w, h] = obj.bbox;   // Array entpacken
+    const [x, y, w, h] = obj.bbox;
     const { id, eDist, pDist, class_idx } = obj;
 
     // Bounding Box zeichnen
-    ctx.strokeStyle = "lime";
+    ctx.strokeStyle = "rgba(0, 150, 255, 0.9)";
     ctx.strokeRect(x, y, w, h);
 
-    // Label: stabile ID + Klassenname
-    const className = classes.classes?.[class_idx] ?? `Class ${class_idx}`;
-    const label = `B${id} - ${eDist.toFixed(2)}-${pDist.toFixed(2)}`;//${className}
+    // Heatmap-Farben
+    const eColor = heatColor(eDist, 0.6);   // maxEmbDist
+    const pColor = heatColor(pDist, 0.5);   // maxPosDist
+    const score = eDist + pDist;
+    const scoreColor = heatColor(score, 1.0);
 
-    ctx.fillStyle = "lime";
-    ctx.font = "14px system-ui, sans-serif";
-    ctx.fillText(label, x, y - 4);
+    // Hintergrundbox
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(x, y - 60, 180, 58);
+
+    // Text + Heatmap
+    ctx.fillStyle = "white";
+    ctx.fillText(`ID: ${id}`, x + 5, y - 58);
+
+    ctx.fillStyle = eColor;
+    ctx.fillText(`eDist: ${eDist.toFixed(3)}`, x + 5, y - 42);
+
+    ctx.fillStyle = pColor;
+    ctx.fillText(`pDist: ${pDist.toFixed(3)}`, x + 5, y - 26);
+
+    ctx.fillStyle = scoreColor;
+    ctx.fillText(`score: ${(score).toFixed(3)}`, x + 5, y - 10);
   });
 }
+
 
 
 /**

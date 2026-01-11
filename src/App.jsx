@@ -420,6 +420,48 @@ const loadModel = useCallback(async () => {
     }
   }, []);
 
+// ================= Hilfsfunktionen =================
+
+function iou(boxA, boxB) {
+  const [ax, ay, aw, ah] = boxA;
+  const [bx, by, bw, bh] = boxB;
+
+  const x1 = Math.max(ax, bx);
+  const y1 = Math.max(ay, by);
+  const x2 = Math.min(ax + aw, bx + bw);
+  const y2 = Math.min(ay + ah, bx + bh);
+
+  const interW = Math.max(0, x2 - x1);
+  const interH = Math.max(0, y2 - y1);
+  const inter = interW * interH;
+  if (inter === 0) return 0;
+
+  const areaA = aw * ah;
+  const areaB = bw * bh;
+  return inter / (areaA + areaB - inter);
+}
+
+function mergeOverlappingDetections(dets, iouThresh = 0.6) {
+  const kept = [];
+  for (const det of dets) {
+    let merged = false;
+    for (const k of kept) {
+      if (det.class_idx !== k.class_idx) continue;
+      if (iou(det.bbox, k.bbox) > iouThresh) {
+        // nimm die mit höherem Score
+        if (det.score > k.score) {
+          k.bbox = det.bbox;
+          k.score = det.score;
+        }
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) kept.push({ ...det });
+  }
+  return kept;
+}
+
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
     if (cameraRef.current.srcObject) {
@@ -542,6 +584,9 @@ const loadModel = useCallback(async () => {
     });
 
     // inference loop
+
+    // ================= handle_frame_continuous =================
+
     const handle_frame_continuous = async () => {
       if (!cameraRef.current?.srcObject) {
         inputCanvas = null;
@@ -549,7 +594,8 @@ const loadModel = useCallback(async () => {
         return;
       }
       if (!isCameraActiveRef.current) return;
-      // draw camera frame to input canvas
+
+      // Kamera auf Input-Canvas
       ctx.drawImage(
         cameraRef.current,
         0,
@@ -557,6 +603,7 @@ const loadModel = useCallback(async () => {
         cameraRef.current.videoWidth,
         cameraRef.current.videoHeight
       );
+
       // Inference
       const [results, results_inferenceTime] = await inference_pipeline(
         inputCanvas,
@@ -564,7 +611,7 @@ const loadModel = useCallback(async () => {
         [overlayRef.current.width, overlayRef.current.height],
         modelConfigRef.current
       );
-      // draw results on overlay
+
       const overlayCtx = overlayRef.current.getContext("2d");
       overlayCtx.clearRect(
         0,
@@ -572,29 +619,32 @@ const loadModel = useCallback(async () => {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
-      //nicht bei Tracking
-      // render_overlay(
-      //   results,
-      //   overlayCtx,
-      //   modelConfigRef.current.classes
-      // );
-      //setDetails(results.bbox_results);
 
-      //Hier nun das Tracking 
+      // -------- Tracking --------
       frameIndexRef.current += 1;
       const frameIndex = frameIndexRef.current;
       const berries = berriesRef.current;
       const tracked = [];
-      // Ids für diesen Frame zurücksetzen
-      berriesRef.current.resetFrame();
 
-      for (const det of results.bbox_results) {
-        if (det.score < 0.3) continue;
+      // IDs für diesen Frame zurücksetzen
+      berries.resetFrame();
+
+      // 1. YOLO-Filter (Score + Mindestgröße)
+      let filtered = results.bbox_results.filter(det => {
+        if (det.score < 0.5) return false;
+        const [x, y, w, h] = det.bbox;
+        if (w < 20 || h < 20) return false;
+        return true;
+      });
+
+      // 2. Doppelte Boxen pro Frame mergen
+      filtered = mergeOverlappingDetections(filtered);
+
+      // 3. Pro Detection matchen (dein BerryMatcher)
+      for (const det of filtered) {
         const embedding = computeBerryEmbedding(ctx, det);
-// debugEmbeddingASCII(embedding);
-// debugEmbeddingStats(embedding);
 
-        const result  = berries.match(
+        const result = berries.match(
           det,
           embedding,
           frameIndex,
@@ -602,40 +652,37 @@ const loadModel = useCallback(async () => {
           ctx.canvas.height
         );
 
-        // console.log(
-        //   "Frame:", frameIndex,
-        //   "Det:", det.bbox,
-        //   "Assigned ID:", id
-        // );
-
+        const berry = berries.items.find(b => b.id === result.id);
+        const stable = berry && berry.seenCount >= 3; // Stabilitäts-Schwelle
 
         tracked.push({
           ...det,
-          id:result.id,
-          eDist:result.eDist,
-          pDist:result.pDist,
-          imageWidth: ctx.canvas.width,   // oder cameraRef.current.videoWidth
-          imageHeight: ctx.canvas.height  // oder cameraRef.current.videoHeight
+          id: result.id,
+          eDist: result.eDist,
+          pDist: result.pDist,
+          stable,
+          imageWidth: ctx.canvas.width,
+          imageHeight: ctx.canvas.height
         });
       }
 
-      // console.log("isCameraActiveRef:",isCameraActiveRef.current);
+      // 4. nur stabile Beeren zählen (monoton steigend)
+      const stableCount = berries.items.filter(b => b.seenCount >= 3).length;
 
-      if (isCameraActiveRef.current)
-      {
-          // if (activeFeature !== "camera") return; // Abbrechen, wenn Kamera geschlossen wurde
-          // console.log("getrackte Beeren:", tracked);
-      
-          render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
-          setDetails({
-            frameDetections: tracked,
-            uniqueBerryCount: berries.items.length,
-            // globalBerries: berries.items   // <- neu
-          });
+      if (isCameraActiveRef.current) {
+        // Overlay: du kannst in render_overlaytracked optional eDist/pDist/heatColor nutzen
+        render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+
+        setDetails({
+          frameDetections: tracked,
+          uniqueBerryCount: stableCount
+          // globalBerries: berries.items
+        });
       }
-      setProcessingStatus((prev) => ({
+
+      setProcessingStatus(prev => ({
         ...prev,
-        inferenceTime: results_inferenceTime,
+        inferenceTime: results_inferenceTime
       }));
 
       requestAnimationFrame(handle_frame_continuous);
