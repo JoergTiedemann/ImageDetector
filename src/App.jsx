@@ -1,6 +1,6 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
+import { model_loader,model_loadernew,load_modelEmbedding,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
 import { computeBerryEmbedding } from "./tracking/BerryReID";
@@ -62,6 +62,9 @@ function App() {
   const fileVideoRef = useRef(null);
   const isCameraActiveRef = useRef(false);
   const firstCameraInitDone = useRef(false); // außerhalb von getCameras, z. B. im Component Body
+  const loadingRef = useRef(false);
+  // Referenz für das Embedding-Modell
+  const embeddingSessionRef = useRef(null);
 
   // state
   const [customModels, setCustomModels] = useState([]);
@@ -141,7 +144,6 @@ useEffect(() => {
 }, [videoSrc]);
 
 
-const loadingRef = useRef(false);
 
 const loadModel = useCallback(async () => {
   if (loadingRef.current) {
@@ -162,6 +164,17 @@ const loadModel = useCallback(async () => {
       }
       sessionRef.current = null;
     }
+    // Embedding-Session freigeben
+    if (embeddingSessionRef.current) {
+      try {
+        await embeddingSessionRef.current.release?.();
+        embeddingSessionRef.current.dispose?.();
+        console.log("Alte Embedding-Session freigegeben");
+      } catch (disposeErr) {
+        console.warn("Fehler beim Freigeben der alten Embedding-Session:", disposeErr);
+      }
+      embeddingSessionRef.current = null;
+    }
     modelCache.current = {};
 
     setProcessingStatus(prev => ({
@@ -177,6 +190,10 @@ const loadModel = useCallback(async () => {
       ? customModel.url
       : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
     modelConfig.model_path = model_path;
+
+    // Embedding-Modellpfad bestimmen
+    // Annahme: gleiches Verzeichnis, Name: embedding9k_100-detect.onnx
+    const embeddingModelPath = `${window.location.href}/models/embedding9k_100_single-detect.onnx`;
 
     let backend = await detectBackend();
     console.log("Start Model laden");
@@ -208,6 +225,16 @@ const loadModel = useCallback(async () => {
     sessionRef.current = yolo_model;
     const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
     modelCache.current[cacheKey] = yolo_model;
+
+    // Embedding-Modell laden
+    try {
+      const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
+      embeddingSessionRef.current = embeddingResult.yolo_model;
+      console.log("Embedding-Modell geladen");
+    } catch (embeddingErr) {
+      console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
+      embeddingSessionRef.current = null;
+    }
 
     setProcessingStatus(prev => ({
       ...prev,

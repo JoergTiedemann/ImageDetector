@@ -140,3 +140,39 @@ export async function model_loader(model_path, backend) {
  return {  yolo_model:yolo_model, provider: backend };
   // return yolo_model;
 }
+
+export async function load_modelEmbedding(modelPath, backend = "wasm") {
+  const session = await InferenceSession.create(modelPath, {
+    executionProviders: [backend],
+  });
+
+  const inputName = session.inputNames[0];
+  const outputName = session.outputNames[0];
+
+  // Fallback-Dims
+  let dims = [1, 3, 128, 128];
+
+  // Dummy erzeugen
+  let dummy = new Tensor(
+    "float32",
+    new Float32Array(dims.reduce((a, b) => a * b)),
+    dims
+  );
+
+  // Warmup
+  await session.run({ [inputName]: dummy });
+
+  // Jetzt erneut Metadata lesen
+  const meta = session.inputMetadata[inputName];
+  if (meta && meta.dimensions) {
+    dims = meta.dimensions.map(d => (typeof d === "number" ? d : 1));
+  }
+
+  return {
+    session,
+    inputName,
+    outputName,
+    dims,
+    provider: backend,
+  };
+}
