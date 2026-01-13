@@ -4,7 +4,7 @@ import { model_loader,model_loadernew,load_modelEmbedding,detectBackend,isIPhone
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
 import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { BerryMatcher,countBerriesByClass,countBerryArrayByClass,debugEmbeddingASCII,debugEmbeddingStats } from "./tracking/BerryMatcher";
+import { Berries,countBerriesByClass,countBerryArrayByClass} from "./tracking/BerryMatcher";
 
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
@@ -84,7 +84,7 @@ function App() {
   const videoWorkerRef = useRef(null);
 
   // Tracking
-  const berriesRef = useRef(new BerryMatcher());
+  const berriesRef = useRef(new Berries());
   const frameIndexRef = useRef(0);
 
 // Init page
@@ -229,8 +229,8 @@ const loadModel = useCallback(async () => {
     // Embedding-Modell laden
     try {
       const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
-      embeddingSessionRef.current = embeddingResult.yolo_model;
-      console.log("Embedding-Modell geladen");
+      embeddingSessionRef.current = embeddingResult;
+      console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
     } catch (embeddingErr) {
       console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
       embeddingSessionRef.current = null;
@@ -613,7 +613,6 @@ function mergeOverlappingDetections(dets, iouThresh = 0.6) {
     // inference loop
 
     // ================= handle_frame_continuous =================
-
     const handle_frame_continuous = async () => {
       if (!cameraRef.current?.srcObject) {
         inputCanvas = null;
@@ -666,43 +665,60 @@ function mergeOverlappingDetections(dets, iouThresh = 0.6) {
 
       // 2. Doppelte Boxen pro Frame mergen
       filtered = mergeOverlappingDetections(filtered);
-
+      // console.log(`Frame ${frameIndex}: ${filtered.length} Detections nach Filter und Merge Current:${embeddingSessionRef.current}`);
       // 3. Pro Detection matchen (dein BerryMatcher)
-      for (const det of filtered) {
-        const embedding = computeBerryEmbedding(ctx, det);
+      if (embeddingSessionRef.current && embeddingSessionRef.current.session) {
+        // console.log("Starte Embedding-basiertes Tracking");
+          for (const det of filtered) {""
+            console.log("Verarbeite Detection:", det);
+            // Embedding mit embeddingSessionRef berechnen (async!)
+            const embedding = await computeBerryEmbedding(ctx, det, embeddingSessionRef.current.session);
+            console.log("Embedding berechnet für Det ID:", det," Embedding:", embedding);
 
-        const result = berries.match(
-          det,
-          embedding,
-          frameIndex,
-          ctx.canvas.width,
-          ctx.canvas.height
-        );
+          // console.log("Embedding returned:", embedding);
+          const matchResult = berries.match(
+            det,
+            embedding,
+            frameIndex,
+            ctx.canvas.width,
+            ctx.canvas.height
+          );
 
-        const berry = berries.items.find(b => b.id === result.id);
-        const stable = berry && berry.seenCount >= 3; // Stabilitäts-Schwelle
-
-        tracked.push({
-          ...det,
-          id: result.id,
-          eDist: result.eDist,
-          pDist: result.pDist,
-          stable,
-          imageWidth: ctx.canvas.width,
-          imageHeight: ctx.canvas.height
-        });
+          tracked.push({
+            ...det,
+            id: matchResult.id,
+            similarity: matchResult.similarity,
+            isNew: matchResult.isNew,
+            imageWidth: ctx.canvas.width,
+            imageHeight: ctx.canvas.height
+          });
+        }
+      } else {
+        // Fallback: kein Embedding-Modell geladen, nur Bounding Boxes anzeigen
+        for (const det of filtered) {
+          tracked.push({
+            ...det,
+            id: undefined,
+            similarity: undefined,
+            isNew: undefined,
+            imageWidth: ctx.canvas.width,
+            imageHeight: ctx.canvas.height
+          });
+        }
       }
-
-      // 4. nur stabile Beeren zählen (monoton steigend)
-      const stableCount = berries.items.filter(b => b.seenCount >= 3).length;
 
       if (isCameraActiveRef.current) {
         // Overlay: du kannst in render_overlaytracked optional eDist/pDist/heatColor nutzen
-        render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+      render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+      // await render_overlay(
+      //   results,
+      //   overlayCtx,
+      //   modelConfigRef.current.classes
+      // );
 
         setDetails({
           frameDetections: tracked,
-          uniqueBerryCount: stableCount
+          uniqueBerryCount: berries.items.length
           // globalBerries: berries.items
         });
       }

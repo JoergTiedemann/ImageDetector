@@ -38,44 +38,33 @@ function heatColor(value, max) {
 
 
 export function render_overlaytracked(tracked, ctx, classes) {
-  if (!tracked || tracked.length === 0) return;
-
   ctx.lineWidth = 2;
   ctx.font = "14px Arial";
   ctx.textBaseline = "top";
 
-  tracked.forEach(obj => {
-    const [x, y, w, h] = obj.bbox;
-    const { id, eDist, pDist, class_idx } = obj;
+  for (const det of tracked) {
+    // Annahme: det.bbox = [x, y, w, h]
+    const [x, y, w, h] = det.bbox;
 
-    // Bounding Box zeichnen
-    ctx.strokeStyle = "rgba(0, 150, 255, 0.9)";
+    // Box zeichnen
+    ctx.strokeStyle = det.isNew ? "yellow" : "lime";
     ctx.strokeRect(x, y, w, h);
 
-    // Heatmap-Farben
-    const eColor = heatColor(eDist, 0.6);   // maxEmbDist
-    const pColor = heatColor(pDist, 0.5);   // maxPosDist
-    const score = eDist + pDist;
-    const scoreColor = heatColor(score, 1.0);
+    // Debug-Text
+    const idText = `ID: ${det.id}${det.isNew ? " (new)" : ""}`;
+    const simText = det.similarity !== null && det.similarity !== undefined
+      ? `Sim: ${det.similarity.toFixed(2)}`
+      : "Sim: -";
 
-    // Hintergrundbox
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(x, y - 60, 180, 58);
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x, y - 30, 120, 30);
 
-    // Text + Heatmap
     ctx.fillStyle = "white";
-    ctx.fillText(`ID: ${id}`, x + 5, y - 58);
-
-    ctx.fillStyle = eColor;
-    ctx.fillText(`eDist: ${eDist.toFixed(3)}`, x + 5, y - 42);
-
-    ctx.fillStyle = pColor;
-    ctx.fillText(`pDist: ${pDist.toFixed(3)}`, x + 5, y - 26);
-
-    ctx.fillStyle = scoreColor;
-    ctx.fillText(`score: ${(score).toFixed(3)}`, x + 5, y - 10);
-  });
+    ctx.fillText(idText, x + 4, y - 28);
+    ctx.fillText(simText, x + 4, y - 14);
+  }
 }
+
 
 
 
