@@ -41,7 +41,7 @@ Cosine Similarity für die Ähnlichkeit der Embeddings
 Farbähnlichkeit  
 Größenähnlichkeit  
 Daraus ergibt sich dann ein Gesamtscore    
-![Screenshot](SCreen.jpg)
+![Screenshot](Screen.jpg)
 
 ## Entscheidungslogik
 Entscheidungslogik wie folgt 
