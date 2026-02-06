@@ -1,3 +1,5 @@
+
+
 # Smart Fruit Finder
 Anwendung zu Detektierung von Obst und Beeren mit Vorhersage des Reifegrades und des möglichen Ernteertrags
 ## Funktion
@@ -23,8 +25,49 @@ Hier folgenden Befehl verwenden:
 yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
 ```
 
+# Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild
+Man braucht kein Tracking, sondern globale Wiedererkennung.  
+Jede Beere wird zu einem Cluster, der über die Zeit wächst.
+Neue Beobachtungen werden gegen diese Cluster gemachted.  
+Jede Beere wird in einem globalen Archiv berryReIdManager.archive gespeichert
+Für jede erkannte Beere wird berechnet:
+- Embedding (aus einem Extra Modell) Hier wird aber ein Durchschnittsembedding der letzten 20 Erkennungen zum Vergleich herangezogen
+- Farb‑Histogramm (HSV, 32–64 bins)
+- Größe (bbox area oder sqrt(area))
 
+Dann wird ein Score gebildet:
 
+Cosine Similarity für die Ähnlichkeit der Embeddings
+Farbähnlichkeit  
+Größenähnlichkeit  
+Daraus ergibt sich dann ein Gesamtscore    
+![Screenshot](SCreen.jpg)
+
+## Entscheidungslogik
+Entscheidungslogik wie folgt 
+1. Kandidaten filtern
+Nur Beeren, die eine bestimmte grösse haben, die nicht mit anderen boxen überlappen und die in den letzten 600 Frames gesehen wurden, werden geprüft.
+(Verhindert, dass alte Cluster alles matchen.)
+2. Bestes Match wählen
+Wenn:
+- S > 0.985 → gleiche Beere
+- S < 0.965 → neue Beere
+- dazwischen → heuristisch (z. B. Größe bevorzugen)
+
+3. Cluster aktualisieren  
+Wenn Match:
+- Embedding hinzufügen
+- meanEmbedding neu berechnen
+- colorHist updaten
+- sizeStats updaten
+- lastSeen = currentFrame
+
+4. Neue ID vergeben
+Wenn kein Match → neue ID + neuer Cluster.
+
+Damit eine Beere als gültig erkannt wird muss sie zusätzlich noch mindestens eine Anzahl an Frames gesehen worden sein, diese Anzahl wird aktuell noch in der Konfig über die Oberfläche eingestellt
+
+Damit wird beim laufenden Kamerabild eine Doppelzählung einigermaßen verhindert (aber noch nicht komplett) 
 
 # React + Vite
 

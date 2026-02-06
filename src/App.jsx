@@ -1,17 +1,20 @@
 import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { model_loader,model_loadernew,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
+import { model_loader,model_loadernew,load_modelEmbedding,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
 import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { BerryMatcher,countBerriesByClass,countBerryArrayByClass } from "./tracking/BerryMatcher";
+import { Berries,countBerryArrayByClass} from "./tracking/BerryMatcher";
+import { berryReIdManager,countBerriesByClass,countBerriesConfirmed } from "./tracking/berryReIdManager"; 
+
 
 import classes from "./utils/yolo_classes.json";
 import berry  from "./utils/berry_classes.json";
 import packageJson from "../package.json"; // Pfad anpassen!
 const appVersion = packageJson.version;
 const isIPhoneSE = isIPhoneSEDevice();
-
+let inputCanvas = null;
+let ctx = null;
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -30,6 +33,7 @@ const MODEL_CONFIG = {
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad",
+  repeatFrameCount: 10,   // Anzahl Frames, die eine Beere mindestens erkannt werden muss, um als "confirmed" zu gelten
   classes: { classes: [...berry.berry9k] },
 };
 
@@ -62,6 +66,9 @@ function App() {
   const fileVideoRef = useRef(null);
   const isCameraActiveRef = useRef(false);
   const firstCameraInitDone = useRef(false); // außerhalb von getCameras, z. B. im Component Body
+  const loadingRef = useRef(false);
+  // Referenz für das Embedding-Modell
+  const embeddingSessionRef = useRef(null);
 
   // state
   const [customModels, setCustomModels] = useState([]);
@@ -81,7 +88,7 @@ function App() {
   const videoWorkerRef = useRef(null);
 
   // Tracking
-  const berriesRef = useRef(new BerryMatcher());
+  const berriesRef = useRef(new Berries());
   const frameIndexRef = useRef(0);
 
 // Init page
@@ -141,7 +148,6 @@ useEffect(() => {
 }, [videoSrc]);
 
 
-const loadingRef = useRef(false);
 
 const loadModel = useCallback(async () => {
   if (loadingRef.current) {
@@ -162,6 +168,17 @@ const loadModel = useCallback(async () => {
       }
       sessionRef.current = null;
     }
+    // Embedding-Session freigeben
+    if (embeddingSessionRef.current) {
+      try {
+        await embeddingSessionRef.current.release?.();
+        embeddingSessionRef.current.dispose?.();
+        console.log("Alte Embedding-Session freigegeben");
+      } catch (disposeErr) {
+        console.warn("Fehler beim Freigeben der alten Embedding-Session:", disposeErr);
+      }
+      embeddingSessionRef.current = null;
+    }
     modelCache.current = {};
 
     setProcessingStatus(prev => ({
@@ -177,6 +194,10 @@ const loadModel = useCallback(async () => {
       ? customModel.url
       : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
     modelConfig.model_path = model_path;
+
+    // Embedding-Modellpfad bestimmen
+    // Annahme: gleiches Verzeichnis, Name: embedding9k_100-detect.onnx
+    const embeddingModelPath = `${window.location.href}/models/embedding9k_100_single-detect.onnx`;
 
     let backend = await detectBackend();
     console.log("Start Model laden");
@@ -208,6 +229,16 @@ const loadModel = useCallback(async () => {
     sessionRef.current = yolo_model;
     const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
     modelCache.current[cacheKey] = yolo_model;
+
+    // Embedding-Modell laden
+    try {
+      const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
+      embeddingSessionRef.current = embeddingResult;
+      console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
+    } catch (embeddingErr) {
+      console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
+      embeddingSessionRef.current = null;
+    }
 
     setProcessingStatus(prev => ({
       ...prev,
@@ -420,6 +451,105 @@ const loadModel = useCallback(async () => {
     }
   }, []);
 
+// ================= Hilfsfunktionen =================
+
+function iou(boxA, boxB) {
+  const [ax, ay, aw, ah] = boxA;
+  const [bx, by, bw, bh] = boxB;
+
+  const x1 = Math.max(ax, bx);
+  const y1 = Math.max(ay, by);
+  const x2 = Math.min(ax + aw, bx + bw);
+  const y2 = Math.min(ay + ah, by + bh);
+
+  const interW = Math.max(0, x2 - x1);
+  const interH = Math.max(0, y2 - y1);
+  const inter = interW * interH;
+  if (inter === 0) return 0;
+
+  const areaA = aw * ah;
+  const areaB = bw * bh;
+  return inter / (areaA + areaB - inter);
+}
+
+function mergeOverlappingDetections(dets, iouThresh = 0.6) {
+  const kept = [];
+  for (const det of dets) {
+    let merged = false;
+    for (const k of kept) {
+      if (det.class_idx !== k.class_idx) continue;
+      if (iou(det.bbox, k.bbox) > iouThresh) {
+        // nimm die mit höherem Score
+        if (det.score > k.score) {
+          k.bbox = det.bbox;
+          k.score = det.score;
+        }
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) kept.push({ ...det });
+  }
+  return kept;
+}
+
+function computeColorHistogram(ctx, det, bins = 32) {
+  let [x, y, w, h] = det.bbox;
+
+  // Pixel-Koordinaten runden
+  x = Math.floor(x);
+  y = Math.floor(y);
+  w = Math.floor(w);
+  h = Math.floor(h);
+
+  if (w < 2 || h < 2) {
+    return new Array(bins).fill(1 / bins);
+  }
+
+  const imgData = ctx.getImageData(x, y, w, h);
+  const data = imgData.data;
+  const hist = new Array(bins).fill(0);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+
+    // komplett schwarze Pixel überspringen (vermeidet Hue-NaN)
+    if (r === 0 && g === 0 && b === 0) continue;
+
+    const hue = rgbToHue(r, g, b); // Wert in [0,1] erwartet
+    if (Number.isNaN(hue)) continue;
+
+    let bin = Math.floor(hue * bins);
+    if (bin < 0) bin = 0;
+    if (bin >= bins) bin = bins - 1;
+
+    hist[bin] += 1;
+  }
+
+  const sum = hist.reduce((a, b) => a + b, 0);
+
+  // WICHTIG: sum==0 absichern → sonst NaN
+  if (sum === 0) {
+    return new Array(bins).fill(1 / bins);
+  }
+
+  return hist.map(v => v / sum);
+}
+
+function rgbToHue(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+
+  if (d === 0) return 0;
+  if (max === r) return ((g - b) / d) % 6;
+  if (max === g) return (b - r) / d + 2;
+  return (r - g) / d + 4;
+}
+
+
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
     if (cameraRef.current.srcObject) {
@@ -430,21 +560,22 @@ const loadModel = useCallback(async () => {
       overlayRef.current.height = 0;
       isCameraActiveRef.current = false;
 
-      // const result = countBerriesByClass(berriesRef.current);
+      // const result = countBerriesByClass(berryReIdManager);
       // console.log("Endergebnis:", result);
       // Ausgabe: { unreif: X, mittelreif: Y, reif: Z }
       setDetails({
         // frameDetections: tracked,
         // uniqueBerryCount: berries.items.length,
-        globalBerryInfo: countBerriesByClass(berriesRef.current)   // <- neu
+        globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
       });
       // setDetails([]);
       setActiveFeature(null);
     } else {
       // open camera
       //erstmal alle bisherigen getrackten Beeren löschen
-      berriesRef.current.items = [];
-      berriesRef.current.nextId = 1;
+      berryReIdManager.reset();
+      // berriesRef.current.items = [];
+      // berriesRef.current.nextId = 1;
       isCameraActiveRef.current = true;
       try {
         setProcessingStatus((prev) => ({
@@ -532,16 +663,22 @@ const loadModel = useCallback(async () => {
     overlayRef.current.width = cameraRef.current.clientWidth;
     overlayRef.current.height = cameraRef.current.clientHeight;
 
-    // create offscreen canvas for input
-    let inputCanvas = new OffscreenCanvas(
-      cameraRef.current.videoWidth,
-      cameraRef.current.videoHeight
-    );
-    let ctx = inputCanvas.getContext("2d", {
+    // // create offscreen canvas for input
+    // let inputCanvas = new OffscreenCanvas(
+    //   cameraRef.current.videoWidth,
+    //   cameraRef.current.videoHeight
+    // );
+    inputCanvas = document.createElement("canvas");
+    inputCanvas.width = cameraRef.current.videoWidth;
+    inputCanvas.height = cameraRef.current.videoHeight;
+
+    ctx = inputCanvas.getContext("2d", {
       willReadFrequently: true,
     });
 
     // inference loop
+
+    // ================= handle_frame_continuous =================
     const handle_frame_continuous = async () => {
       if (!cameraRef.current?.srcObject) {
         inputCanvas = null;
@@ -549,7 +686,17 @@ const loadModel = useCallback(async () => {
         return;
       }
       if (!isCameraActiveRef.current) return;
-      // draw camera frame to input canvas
+
+      // 🔥 Canvas korrekt initialisieren (NICHT OffscreenCanvas!)
+      if (!inputCanvas) {
+        inputCanvas = document.createElement("canvas");
+      }
+
+      inputCanvas.width = cameraRef.current.videoWidth;
+      inputCanvas.height = cameraRef.current.videoHeight;
+      ctx = inputCanvas.getContext("2d", { willReadFrequently: true });
+
+      // Kamera auf Input-Canvas
       ctx.drawImage(
         cameraRef.current,
         0,
@@ -557,6 +704,10 @@ const loadModel = useCallback(async () => {
         cameraRef.current.videoWidth,
         cameraRef.current.videoHeight
       );
+      // console.log("Canvas size:", ctx.canvas.width, ctx.canvas.height);
+      // console.log("ctx:", ctx);
+
+
       // Inference
       const [results, results_inferenceTime] = await inference_pipeline(
         inputCanvas,
@@ -564,7 +715,7 @@ const loadModel = useCallback(async () => {
         [overlayRef.current.width, overlayRef.current.height],
         modelConfigRef.current
       );
-      // draw results on overlay
+
       const overlayCtx = overlayRef.current.getContext("2d");
       overlayCtx.clearRect(
         0,
@@ -572,66 +723,87 @@ const loadModel = useCallback(async () => {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
-      //nicht bei Tracking
-      // render_overlay(
-      //   results,
-      //   overlayCtx,
-      //   modelConfigRef.current.classes
-      // );
-      //setDetails(results.bbox_results);
 
-      //Hier nun das Tracking 
+      // -------- Re-ID Tracking --------
       frameIndexRef.current += 1;
       const frameIndex = frameIndexRef.current;
-      const berries = berriesRef.current;
       const tracked = [];
-      // Ids für diesen Frame zurücksetzen
-      berriesRef.current.resetFrame();
 
-      for (const det of results.bbox_results) {
-        if (det.score < 0.3) continue;
+      // 1. YOLO-Filter
+      // kleine Boxen (w oder h < 20px) und schwache Scores (score < 0.5) werden gefiltert
+      let filtered = results.bbox_results.filter(det => {
+        if (det.score < 0.5) return false;
+        const [x, y, w, h] = det.bbox;
+        if (w < 20 || h < 20) return false;
+        return true;
+      });
 
-        const embedding = computeBerryEmbedding(ctx, det);
-        const id = berries.match(
-          det,
-          embedding,
-          frameIndex,
-          ctx.canvas.width,
-          ctx.canvas.height
-        );
+      // 2. Merge
+      // bounding boxes, die sich stark überlappen (IoU > 0.6) und zur selben Klasse gehören, werden gemerged (nämlich die mit dem höheren Score behalten)
+      filtered = mergeOverlappingDetections(filtered);
 
-        // console.log(
-        //   "Frame:", frameIndex,
-        //   "Det:", det.bbox,
-        //   "Assigned ID:", id
-        // );
+      // 3. Re-ID Matching
+      if (embeddingSessionRef.current && embeddingSessionRef.current.session) {
+        for (const det of filtered) {
+          // --- Embedding extrahieren ---
+          const embedding = await computeBerryEmbedding(
+            ctx,
+            det,
+            embeddingSessionRef.current.session
+          );
+          // 🔍 HIER: Raw YOLO Bounding Box loggen
+          // console.log("Raw bbox:", det.bbox);
 
 
-        tracked.push({
-          ...det,
-          id,
-          imageWidth: ctx.canvas.width,   // oder cameraRef.current.videoWidth
-          imageHeight: ctx.canvas.height  // oder cameraRef.current.videoHeight
+          // --- Color Histogram extrahieren -
+          const colorHist = computeColorHistogram(ctx, det);
+
+          // --- Größe extrahieren ---
+          const [x, y, w, h] = det.bbox;
+          const size = w * h;
+
+          // ------------------------------
+          // 🔍 DEBUG LOGS HIER EINBAUEN
+          // ------------------------------
+          // console.log("---- DEBUG FRAME", frameIndex, "----");
+          // console.log("Embedding length:", embedding.length);
+          // console.log("Embedding sample:", embedding.slice(0, 5));
+          // console.log("ColorHist sample:", colorHist.slice(0, 5));
+          // console.log("Size:", size);
+
+
+          const match = berryReIdManager.processDetection(
+            { embedding, colorHist, size, class_idx: det.class_idx },
+            frameIndex,
+             modelConfigRef.current.repeatFrameCount // <-- hier übergeben
+          );
+
+          tracked.push({
+            ...det,
+            id: match.id,
+            confirmed: match.confirmed,
+            similarity: match.score,
+            isNew: match.isNew,
+            imageWidth: ctx.canvas.width,
+            imageHeight: ctx.canvas.height
+          });
+        }
+      }
+
+      // Overlay
+      if (isCameraActiveRef.current) {
+        render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
+
+        setDetails({
+          frameDetections: tracked,
+          // uniqueBerryCount: berryReIdManager.archive.length
+          uniqueBerryCount: countBerriesConfirmed(berryReIdManager).total
         });
       }
 
-      // console.log("isCameraActiveRef:",isCameraActiveRef.current);
-
-      if (isCameraActiveRef.current)
-      {
-          // if (activeFeature !== "camera") return; // Abbrechen, wenn Kamera geschlossen wurde
-          // console.log("getrackte Beeren:", tracked);
-      
-          render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
-          setDetails({
-            frameDetections: tracked,
-            uniqueBerryCount: berries.items.length,
-            // globalBerries: berries.items   // <- neu
-          });
-      }
-      setProcessingStatus((prev) => ({
+      setProcessingStatus(prev => ({
         ...prev,
-        inferenceTime: results_inferenceTime,
+        inferenceTime: results_inferenceTime
       }));
 
       requestAnimationFrame(handle_frame_continuous);
