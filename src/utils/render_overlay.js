@@ -47,7 +47,8 @@ export function render_overlaytracked(tracked, ctx, classes) {
     const [x, y, w, h] = det.bbox;
 
     // Box zeichnen
-    ctx.strokeStyle = det.isNew ? "yellow" : "lime";
+    // ctx.strokeStyle = det.isNew ? "yellow" : "lime";
+    ctx.strokeStyle = det.confirmed === false  ? "yellow" : "lime";
     ctx.strokeRect(x, y, w, h);
 
     // Debug-Text

@@ -9,9 +9,6 @@ const modelClassMap = {
   yolo12n: "default",
 };
 
-
-
-
 const SettingsPanel = memo(function SettingsPanel({
   backendSelectorRef,
   modelSelectorRef,
@@ -54,6 +51,13 @@ const SettingsPanel = memo(function SettingsPanel({
       firstCameraInitDone.current = true;
     }
   }, [cameras, cameraSelectorRef]);
+
+  // Initialisierung repeatFrameCount falls nicht gesetzt
+  useEffect(() => {
+    if (modelConfigRef.current && typeof modelConfigRef.current.repeatFrameCount === "undefined") {
+      modelConfigRef.current.repeatFrameCount = 10;
+    }
+  }, [modelConfigRef]);
 
   return (
     <div
@@ -228,6 +232,24 @@ const SettingsPanel = memo(function SettingsPanel({
                     ))
                   )}
                 </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-gray-300 mb-1 text-sm font-medium">
+                  repeatFrameCount:
+                </label>
+                <input
+                  type="number"
+                  min={4}
+                  max={50}
+                  defaultValue={modelConfigRef.current.repeatFrameCount ?? 10}
+                  onChange={e => {
+                    const val = Math.max(4, Math.min(50, parseInt(e.target.value, 10) || 10));
+                    modelConfigRef.current.repeatFrameCount = val;
+                  }}
+                  disabled={activeFeature !== null}
+                  className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
+                />
               </div>
 
               {/* <div className="flex flex-col">

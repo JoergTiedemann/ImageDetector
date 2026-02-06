@@ -15,7 +15,7 @@ export async function computeBerryEmbedding(ctx, det, embeddingSession) {
   const cropW = x2 - x1;
   const cropH = y2 - y1;
 
-  console.log("BBox:", det.bbox, "→ Crop:", x1, y1, cropW, cropH);
+  // console.log("BBox:", det.bbox, "→ Crop:", x1, y1, cropW, cropH);
 
   if (cropW <= 2 || cropH <= 2) return null;
 
