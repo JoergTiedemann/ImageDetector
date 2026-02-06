@@ -47,6 +47,7 @@ export const berryReIdManager = {
     // -----------------------------
     // Matching berechnen
     // -----------------------------
+    // das was in den letzten 600 Frames gesehen wurde, wird berücksichtigt (ca. 20 Sekunden bei 30fps)
     for (const berry of this.archive) {
       if (frameIndex - berry.lastSeen > 600) continue;
 

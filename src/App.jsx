@@ -730,6 +730,7 @@ function rgbToHue(r, g, b) {
       const tracked = [];
 
       // 1. YOLO-Filter
+      // kleine Boxen (w oder h < 20px) und schwache Scores (score < 0.5) werden gefiltert
       let filtered = results.bbox_results.filter(det => {
         if (det.score < 0.5) return false;
         const [x, y, w, h] = det.bbox;
@@ -738,6 +739,7 @@ function rgbToHue(r, g, b) {
       });
 
       // 2. Merge
+      // bounding boxes, die sich stark überlappen (IoU > 0.6) und zur selben Klasse gehören, werden gemerged (nämlich die mit dem höheren Score behalten)
       filtered = mergeOverlappingDetections(filtered);
 
       // 3. Re-ID Matching

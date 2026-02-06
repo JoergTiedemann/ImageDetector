@@ -52,17 +52,17 @@ export function render_overlaytracked(tracked, ctx, classes) {
     ctx.strokeRect(x, y, w, h);
 
     // Debug-Text
-    const idText = `ID: ${det.id}${det.isNew ? " (new)" : ""}`;
-    const simText = det.similarity !== null && det.similarity !== undefined
-      ? `Sim: ${det.similarity.toFixed(2)}`
-      : "Sim: -";
+    // const idText = `ID: ${det.id}${det.isNew ? " (new)" : ""}`;
+    // const simText = det.similarity !== null && det.similarity !== undefined
+    //   ? `Sim: ${det.similarity.toFixed(2)}`
+    //   : "Sim: -";
 
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(x, y - 30, 120, 30);
+    // ctx.fillStyle = "rgba(0,0,0,0.6)";
+    // ctx.fillRect(x, y - 30, 120, 30);
 
-    ctx.fillStyle = "white";
-    ctx.fillText(idText, x + 4, y - 28);
-    ctx.fillText(simText, x + 4, y - 14);
+    // ctx.fillStyle = "white";
+    // ctx.fillText(idText, x + 4, y - 28);
+    // ctx.fillText(simText, x + 4, y - 14);
   }
 }
 

@@ -236,7 +236,7 @@ const SettingsPanel = memo(function SettingsPanel({
 
               <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
-                  repeatFrameCount:
+                  Aufnahmen bis sichere Erkennung:
                 </label>
                 <input
                   type="number"
