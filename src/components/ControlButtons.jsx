@@ -86,13 +86,13 @@ const ControlButtons = memo(function ControlButtons({
         <input
           type="file"
           accept="image/*"
+          multiple
           hidden
           ref={fileImageRef}
           onChange={(e) => {
-            if (e.target.files[0]) {
-              const file = e.target.files[0];
-              const imgUrl = URL.createObjectURL(file);
-              handle_OpenImage(imgUrl);
+            if (e.target.files.length > 0) {
+              const imgUrls = Array.from(e.target.files).map(file => URL.createObjectURL(file));
+              handle_OpenImage(imgUrls);
               e.target.value = null;
             }
           }}

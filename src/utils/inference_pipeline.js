@@ -46,7 +46,7 @@ export async function inference_pipeline(
       model_config.imgsz_type
     );
     src_mat.delete();
-
+console.log("Pre-processing abgeschlossen, starte Inference…");
     const start = performance.now();
     const { output0 } = await session.run({
       images: input_tensor,
@@ -76,7 +76,7 @@ export async function inference_pipeline(
     ];
   } catch (error) {
     console.error("Inference error:", error);
-    return [[], "0.00"];
+    return [[], error.message];
   }
 }
 

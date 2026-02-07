@@ -47,6 +47,24 @@ function App() {
     statusColor: "inherit",
   });
 
+// --- Eruda Debug Console für iPhone Safari ---
+// useEffect(() => {
+//   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+//   if (isIOS) {
+//     const script = document.createElement("script");
+//     script.src = "https://cdn.jsdelivr.net/npm/eruda";
+//     script.onload = () => {
+//       window.eruda.init({
+//         tool: ['console', 'network', 'resources', 'info']
+//       });
+//       console.log("Eruda Debug-Konsole aktiviert (iPhone Safari)");
+//     };
+//     document.body.appendChild(script);
+//   }
+// }, []);
+
+
   const modelConfigRef = useRef(MODEL_CONFIG);
 
   // resource reference
@@ -57,6 +75,8 @@ function App() {
   const imgszTypeSelectorRef = useRef(null);
   const sessionRef = useRef(null);
   const modelCache = useRef({});
+  const [multiImageUrls, setMultiImageUrls] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // content reference
   const imgRef = useRef(null);
@@ -227,18 +247,20 @@ const loadModel = useCallback(async () => {
     const end = performance.now();
 
     sessionRef.current = yolo_model;
-    const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
-    modelCache.current[cacheKey] = yolo_model;
+    // Chache wollen wir nicht
+    // const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
+    // modelCache.current[cacheKey] = yolo_model;
 
     // Embedding-Modell laden
-    try {
-      const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
-      embeddingSessionRef.current = embeddingResult;
-      console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
-    } catch (embeddingErr) {
-      console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
-      embeddingSessionRef.current = null;
-    }
+    // try {
+    //   const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
+    //   embeddingSessionRef.current = embeddingResult;
+    //   console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
+    // } catch (embeddingErr) {
+    //   console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
+    //   embeddingSessionRef.current = null;
+    // }
+    embeddingSessionRef.current = null;
 
     setProcessingStatus(prev => ({
       ...prev,
@@ -323,10 +345,59 @@ const loadModel = useCallback(async () => {
   }, []);
 
   // Button Upload Image
+  // Mehrfachauswahl: mehrere Bilder nacheinander laden und erkennen
   const handle_OpenImage = useCallback(
-    (imgUrl = null) => {
-      if (imgUrl) {
-        setImgSrc(imgUrl);
+    async (imgUrls = null) => {
+      if (imgUrls && Array.isArray(imgUrls)) {
+        setMultiImageUrls(imgUrls);
+        setCurrentImageIndex(imgUrls.length - 1);
+
+        let allTracked = [];
+        let allGlobalBerryInfo = {};
+        let allUniqueBerryCount = 0;
+        let lastImgUrl = null;
+        for (let index = 0; index < imgUrls.length; index++) {
+          lastImgUrl = imgUrls[index];
+          setImgSrc(lastImgUrl);
+          setActiveFeature("image");
+          // Warte kurz, bis das Bild im DOM ist
+          await new Promise(resolve => setTimeout(resolve, 300));
+          const det = await handle_ImageLoad();
+          // console.log(`Erkennung für Bild ${index + 1}/${imgUrls.length} abgeschlossen`);
+          // console.log("Details:", det);
+          // console.log("GloalBerryInfo aktuell:", det.globalBerryInfo.classMap);
+          if (det && det.frameDetections) {
+            // Bildnummer (imageIndex) zu jedem Detektionseintrag hinzufügen
+            const imageIndex = index + 1;
+            const trackedWithIndex = det.frameDetections.map(obj => ({ ...obj, imageIndex }));
+            allTracked = allTracked.concat(trackedWithIndex);
+            allUniqueBerryCount += det.uniqueBerryCount || 0;
+            if (det.globalBerryInfo && det.globalBerryInfo.classMap) {
+              const classMap = det.globalBerryInfo.classMap;
+              // Map-Objekt
+              for (const [key, value] of classMap.entries()) {
+                // console.log(`Kumulieren Klasse (Map) ${key}:`, value);
+                allGlobalBerryInfo[key] = (allGlobalBerryInfo[key] || 0) + value;
+              }
+            }
+          }
+        }
+        // console.log("GlobalBerryInfo:", allGlobalBerryInfo);
+
+        setDetails({
+          bildanalyse: imgUrls.length,
+          frameDetections: allTracked,
+          uniqueBerryCount: allUniqueBerryCount,
+          globalBerryInfo: allGlobalBerryInfo,
+        });
+        setProcessingStatus((prev) => ({
+          ...prev,
+          statusMsg: `Erkennung für ${imgUrls.length} Bilder abgeschlossen`,
+          statusColor: "green",
+        }));
+        setActiveFeature("image");
+      } else if (imgUrls) {
+        setImgSrc(imgUrls);
         setActiveFeature("image");
       } else if (imgSrc) {
         if (imgSrc.startsWith("blob:")) {
@@ -337,26 +408,29 @@ const loadModel = useCallback(async () => {
         setImgSrc(null);
         setDetails([]);
         setActiveFeature(null);
+        setMultiImageUrls([]);
+        setCurrentImageIndex(0);
       }
     },
     [imgSrc]
   );
 
+    const handle_ImageLoadDummy = useCallback(async (updateDetails = true) => {
+    }, [sessionRef.current]);
+
   // If image loaded, run inference
-  const handle_ImageLoad = useCallback(async () => {
-    // overlay size = image size
+  const handle_ImageLoad = useCallback(async (updateDetails = true) => {
     overlayRef.current.width = imgRef.current.width;
     overlayRef.current.height = imgRef.current.height;
     const tracked = [];
-    // inference
     try {
+      console.log("Starte Inferenz für Bild…");
       const [results, results_inferenceTime] = await inference_pipeline(
         imgRef.current,
         sessionRef.current,
         [overlayRef.current.width, overlayRef.current.height],
         modelConfigRef.current
       );
-      // draw results on overlay
       const overlayCtx = overlayRef.current.getContext("2d");
       overlayCtx.clearRect(
         0,
@@ -364,43 +438,58 @@ const loadModel = useCallback(async () => {
         overlayCtx.canvas.width,
         overlayCtx.canvas.height
       );
-      // console.log("Render Overlay Klassen:",modelConfigRef.current.classes);
       await render_overlay(
         results,
         overlayCtx,
         modelConfigRef.current.classes
       );
 
-      // setDetails(results.bbox_results);
-      let id=0;
+      let id = 0;
       for (const det of results.bbox_results) {
         id++;
-        console.log("Det:", det);
-         tracked.push({
+        tracked.push({
           ...det,
           id,
-          imageWidth: overlayCtx.canvas.width,   // oder cameraRef.current.videoWidth
-          imageHeight: overlayCtx.canvas.height  // oder cameraRef.current.videoHeight
+          imageWidth: overlayCtx.canvas.width,
+          imageHeight: overlayCtx.canvas.height
         });
       }
-
-      console.log("countBerryArrayByClass:",countBerryArrayByClass(results.bbox_results));
-
-      setDetails({
+      const detObj = {
+        bildanalyse: 1,
         frameDetections: tracked,
         uniqueBerryCount: tracked.length,
         globalBerryInfo: countBerryArrayByClass(results.bbox_results)
-          });
-
-
+      };
+      // console.log("handle_ImageLoad - updateDetails:", updateDetails);
+      if (updateDetails === true)
+      {
+          setDetails(detObj);
+      }
       setProcessingStatus((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,
       }));
+      return detObj;
     } catch (error) {
       console.error("Image processing error:", error);
+      return null;
     }
   }, [sessionRef.current]);
+
+
+  const handle_NavigateImage = useCallback(async (direction) => {
+    if (!multiImageUrls.length) return;
+    let newIndex = currentImageIndex + direction;
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex >= multiImageUrls.length) newIndex = multiImageUrls.length - 1;
+    setCurrentImageIndex(newIndex);
+    setImgSrc(multiImageUrls[newIndex]);
+    setActiveFeature("image");
+    setTimeout(() => {
+      handle_ImageLoad(false);
+    }, 300);
+  }, [multiImageUrls, currentImageIndex, handle_ImageLoad]);
+
 
   // Get camera list
   const getCameras = useCallback(async () => {
@@ -564,6 +653,7 @@ function rgbToHue(r, g, b) {
       // console.log("Endergebnis:", result);
       // Ausgabe: { unreif: X, mittelreif: Y, reif: Z }
       setDetails({
+        bildanalyse: 0,
         // frameDetections: tracked,
         // uniqueBerryCount: berries.items.length,
         globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
@@ -795,6 +885,7 @@ function rgbToHue(r, g, b) {
         render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
 
         setDetails({
+          bildanalyse: 0,
           frameDetections: tracked,
           // uniqueBerryCount: berryReIdManager.archive.length
           uniqueBerryCount: countBerriesConfirmed(berryReIdManager).total
@@ -841,15 +932,51 @@ function rgbToHue(r, g, b) {
     }
   }, [videoWorkerMessage]);
 
-  return (
+
+return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
-        <span className="block sm:inline"></span>
-        <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent block sm:inline">
-          {" "}
+        <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent">
           Smart Fruit Finder {appVersion}
         </span>
       </h1>
+
+      {multiImageUrls.length > 1 && activeFeature === "image" && (
+        <div className="flex items-center justify-center gap-3 w-full max-w-4xl mx-auto mb-4">
+
+          {/* Previous Button */}
+          <button
+            className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 
+                      text-white px-3 py-3 rounded-xl w-32 sm:w-40 
+                      text-lg font-semibold shadow-md active:scale-95 
+                      disabled:opacity-40 disabled:scale-100 transition-all"
+            onClick={() => handle_NavigateImage(-1)}
+            disabled={currentImageIndex === 0}
+          >
+            <span className="text-2xl text-gray-200">❮</span>
+            <span className="hidden sm:inline">Zurück</span>
+          </button>
+
+          {/* Counter */}
+          <span className="text-gray-300 text-lg font-semibold text-center whitespace-nowrap flex-1">
+            Bild {currentImageIndex + 1} / {multiImageUrls.length}
+          </span>
+
+          {/* Next Button */}
+          <button
+            className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 
+                      text-white px-3 py-3 rounded-xl w-32 sm:w-40 
+                      text-lg font-semibold shadow-md active:scale-95 
+                      disabled:opacity-40 disabled:scale-100 transition-all"
+            onClick={() => handle_NavigateImage(1)}
+            disabled={currentImageIndex === multiImageUrls.length - 1}
+          >
+            <span className="hidden sm:inline">Weiter</span>
+            <span className="text-2xl text-gray-200">❯</span>
+          </button>
+        </div>
+      )}
+
       <ImageDisplay
         cameraRef={cameraRef}
         imgRef={imgRef}
@@ -857,7 +984,7 @@ function rgbToHue(r, g, b) {
         imgSrc={imgSrc}
         videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
-        onImageLoad={handle_ImageLoad}
+        onImageLoad={handle_ImageLoadDummy}
         // onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
         activeFeature={activeFeature}
       />      
@@ -877,6 +1004,7 @@ function rgbToHue(r, g, b) {
       <ResultsTable
         details={details}
         currentClasses={modelConfigRef.current.classes.classes}
+        currentImageIndex={currentImageIndex}
       />
 
       <ModelStatus

@@ -43,7 +43,7 @@ export const berryReIdManager = {
     let bestId = -1;
     let bestScore = 0;
     this.minConfirmFrames = repeatFrameCount ?? 10;  // 🔥 hier die Konfiguration nutzen
-    console.log("processDetection: minConfirmedFrames:", this.minConfirmFrames);
+    // console.log("processDetection: minConfirmedFrames:", this.minConfirmFrames);
     // -----------------------------
     // Matching berechnen
     // -----------------------------
@@ -134,7 +134,7 @@ export const berryReIdManager = {
   },
 
   updateCluster(id, { embedding, colorHist, size, class_idx }, frameIndex) {
-    console.log("updateCluster: minConfirmedFrames:", this.minConfirmFrames);
+    // console.log("updateCluster: minConfirmedFrames:", this.minConfirmFrames);
 
     const berry = this.archive.find(b => b.id === id);
     if (!berry) return;
