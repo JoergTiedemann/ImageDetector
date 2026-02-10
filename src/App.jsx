@@ -29,10 +29,10 @@ const MODEL_CONFIG = {
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "auto",
-  model: "berry9k_Epoch100",
+  model: "berry9k_Epoch100_320",
   model_path: "",
   task: "detect",
-  imgsz_type: "zeroPad",
+  imgsz_type: "zeroPad320", // "dynamic", "zeroPad" oder "zeroPad320"
   repeatFrameCount: 10,   // Anzahl Frames, die eine Beere mindestens erkannt werden muss, um als "confirmed" zu gelten
   classes: { classes: [...berry.berry9k] },
 };
@@ -48,21 +48,21 @@ function App() {
   });
 
 // --- Eruda Debug Console für iPhone Safari ---
-// useEffect(() => {
-//   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+useEffect(() => {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-//   if (isIOS) {
-//     const script = document.createElement("script");
-//     script.src = "https://cdn.jsdelivr.net/npm/eruda";
-//     script.onload = () => {
-//       window.eruda.init({
-//         tool: ['console', 'network', 'resources', 'info']
-//       });
-//       console.log("Eruda Debug-Konsole aktiviert (iPhone Safari)");
-//     };
-//     document.body.appendChild(script);
-//   }
-// }, []);
+  if (isIOS) {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/eruda";
+    script.onload = () => {
+      window.eruda.init({
+        tool: ['console', 'network', 'resources', 'info']
+      });
+      console.log("Eruda Debug-Konsole aktiviert (iPhone Safari)");
+    };
+    document.body.appendChild(script);
+  }
+}, []);
 
 
   const modelConfigRef = useRef(MODEL_CONFIG);
@@ -215,6 +215,9 @@ const loadModel = useCallback(async () => {
       : `${window.location.href}/models/${modelConfig.model}-${modelConfig.task}.onnx`;
     modelConfig.model_path = model_path;
 
+    console.log("Lade Modell von:", model_path);
+    console.log("ImageSize:", modelConfig.imgsz_type);
+
     // Embedding-Modellpfad bestimmen
     // Annahme: gleiches Verzeichnis, Name: embedding9k_100-detect.onnx
     const embeddingModelPath = `${window.location.href}/models/embedding9k_100_single-detect.onnx`;
@@ -227,18 +230,18 @@ const loadModel = useCallback(async () => {
     // wenn das backend auf auto steht, automatisch wählen
     if (modelConfig.backend === "auto") {
       if (backend === "webgpu") {
-        const result  = await model_loadernew(model_path);
+        const result  = await model_loadernew(model_path,modelConfig.imgsz_type);
         yolo_model = result.yolo_model;
         provider  = result.provider;
       }else {
-        const result = await model_loader(model_path, backend);
+        const result = await model_loader(model_path, backend,modelConfig.imgsz_type);
         yolo_model = result.yolo_model;
         provider = result.provider;
       }
     } else {
       // festes backend
       backend = modelConfig.backend;
-      const result = await model_loader(model_path, backend);
+      const result = await model_loader(model_path, backend,modelConfig.imgsz_type);
       yolo_model = result.yolo_model;
       provider = result.provider;
     }
@@ -252,15 +255,15 @@ const loadModel = useCallback(async () => {
     // modelCache.current[cacheKey] = yolo_model;
 
     // Embedding-Modell laden
-    // try {
-    //   const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
-    //   embeddingSessionRef.current = embeddingResult;
-    //   console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
-    // } catch (embeddingErr) {
-    //   console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
-    //   embeddingSessionRef.current = null;
-    // }
-    embeddingSessionRef.current = null;
+    try {
+      const embeddingResult = await load_modelEmbedding(embeddingModelPath, backend);
+      embeddingSessionRef.current = embeddingResult;
+      console.log("Embedding-Modell geladen Current:", embeddingSessionRef.current);
+    } catch (embeddingErr) {
+      console.warn("Fehler beim Laden des Embedding-Modells:", embeddingErr);
+      embeddingSessionRef.current = null;
+    }
+    // embeddingSessionRef.current = null;
 
     setProcessingStatus(prev => ({
       ...prev,

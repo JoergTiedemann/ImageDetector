@@ -17,6 +17,78 @@ Die Anzahl der Epochen bestimmt die Genauigkeit des Modells epochs=50 ist das ab
 Die Imagesize sollte bei 640 gelassen werden 
 Man kann auch auf google Colab trainieren, da stehen leistungsfähige Rechner zur Verfügiung aber nur eingeschränkte Rechenzeit von ca. 1-2Stunden pro Tag
 Ein entsprechend konfiguriertes Colab Notbook befindet sich im Ordner Colab
+### Anmerkungen
+Man kann das Training unterbrechen mit Ctrl-C
+- Ctrl + C ist völlig sicher.
+- man verliert keine Epochen.
+- best.pt und last.pt werden immer gespeichert.
+- man kann jederzeit exportieren.
+- man kann jederzeit weitertrainieren.
+
+Wenn man z. B. nach 30 Epochen abbricht:
+- best.pt = bestes Modell aus Epoche 1–30
+- last.pt = Modell aus Epoche 30
+Beide sind voll exportierbar.
+
+Man kann weitertrainieren mit
+```
+yolo train model=runs/detect/train/weights/last.pt data=data.yaml epochs=50
+```
+
+### Ultratiny Modell erzeugen
+man brauch die yolov8n_ultra_tiny.yaml Datei  
+und man braucht eine Installationsumgebung
+``` 
+python -m venv venv
+``` 
+dann
+```
+venv\Scripts\activate
+``` 
+dann 
+``` 
+python -m pip install --upgrade pip
+``` 
+dann
+``` 
+pip install --upgrade "pip<24" "setuptools<70" wheel
+``` 
+dann ultralytics 8.0.73
+``` 
+pip install ultralytics==8.0.73
+``` 
+dann das Training im Ordner oberhalb des datasets Ordner
+``` 
+yolo train model=./yolov8n_ultra_tiny.yaml data=./datasets/data.yaml imgsz=320 epochs=50 batch=8 save=True
+``` 
+
+Dann Gewichte extraieren
+extract_weights.py erzeugen mit diesem Inhalt
+``` 
+
+import torch
+from ultralytics import YOLO
+
+# Modell laden
+model = YOLO('runs/detect/train3/weights/best.pt')
+
+# Nur die Gewichte extrahieren
+torch.save(model.model.state_dict(), 'best_weights.pt')
+print("✅ best_weights.pt erfolgreich gespeichert.")
+``` 
+Dann aufrufen
+
+python extract_weights.py     
+``` 
+
+Dann der Export nach onnx
+```
+python -c "from ultralytics import YOLO; import torch; m=YOLO('yolov8n_ultra_tiny.yaml'); m.model.load_state_dict(torch.load('best_weights.pt')); m.export(format='onnx', imgsz=320, opset=12, dynamic=True, simplify=False)"
+
+```
+das hier geht nicht
+yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12
+
 
 ### Exportieren
 nach dem Training wird ein Export in das onnx Format benötigt damit die onnxruntime-web engine das Model laden und verarbeiten kann.  
@@ -24,6 +96,7 @@ Hier folgenden Befehl verwenden:
 ``` 
 yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
 ```
+Wenn dort eine andere Imagesize angegeben wird kann man das Modell verschlanken so das es weniger Speicher verbraucht
 
 # Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild
 Man braucht kein Tracking, sondern globale Wiedererkennung.  

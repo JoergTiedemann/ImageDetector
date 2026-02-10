@@ -30,7 +30,16 @@ const preProcess_img = (src_mat, size, imgsz_type) => {
       preProcessed.data32F,
       [1, 3, model_size[1], model_size[0]] // [batch, channel, height, width]
     );
+  } else if (imgsz_type === "zeroPad320") {
+    const model_size = [320, 320];
+    [preProcessed, xRatio, yRatio] = img_zeroPad(src_mat, model_size, size);
+    input_tensor = new Tensor(
+      "float32",
+      preProcessed.data32F,
+      [1, 3, model_size[1], model_size[0]]
+    );
   }
+
   preProcessed.delete();
 
   return [input_tensor, xRatio, yRatio];
