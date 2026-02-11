@@ -34,7 +34,8 @@ Man kann weitertrainieren mit
 ```
 ACHTUNG Pfad beachten
 yolo train resume=TRUE model=runs/detect/train/weights/last.pt 
-Die Parameter data=data.yaml epochs=50 brauchen vermutlich nicht mit angegeben werden
+Die Parameter data=data.yaml epochs=50 brauchen nicht mit angegeben werden können es aber wenn neue Werte verwendet werden sollen (z.B. anderen Epochs oder oder batch)
+
 ```
 
 ### Ultratiny Modell on the scratch erzeugen
