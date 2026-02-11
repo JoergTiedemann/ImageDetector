@@ -86,11 +86,12 @@ export async function model_loadernew(model_path,imgsz_type) {
 const inputName = session.inputNames[0];
 const inputMeta = session.inputMetadata[inputName];
 console.log("Input name:", inputName);
-console.log("Meta:", inputMeta);
+console.log("imgsz_type:", imgsz_type);
 
       console.log("WebGPU Session erstellt, starte Warmup…");
 
       if (imgsz_type === "zeroPad320") {
+      console.log("WebGPU Session erstellt, starte Warmup… mit 320x320 Dummy Input");
 // const dummy = new Tensor(
 //   "float32",
 //   new Float32Array(1 * 3 * 320 * 320),

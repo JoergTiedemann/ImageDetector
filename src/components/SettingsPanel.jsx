@@ -5,7 +5,7 @@ const modelClassMap = {
   berry2k_100: "berry",
   berry9k_Epoch100: "berry9k",
   berry9k_Epoch100_320: "berry9k_320",
-  berry9k_ultratiny_320: "berryh9k_320",
+  berry9k_ultratiny_320: "berry9k_ultratiny_320",
   yolo11n: "default",
   yolo11s: "default",
   yolo12n: "default",
@@ -144,9 +144,11 @@ const SettingsPanel = memo(function SettingsPanel({
                         modelConfigRef.current.classes = { classes: [...berry.berry9k] };
                         classFileSelectedRef.current.value = "berry9k";
                       } else if (mappedClass === "berry9k_ultratiny_320") {
+
                         modelConfigRef.current.imgsz_type = "zeroPad320";
                         modelConfigRef.current.classes = { classes: [...berry.berry9k] };
                         classFileSelectedRef.current.value = "berry9k";
+                        // console.log("SizeType:",modelConfigRef.current.imgsz_type);
                       }
 
                       // Falls du auch Custom-Modelle mit eigenen Klassen hast:

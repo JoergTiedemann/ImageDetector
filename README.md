@@ -59,11 +59,15 @@ pip install ultralytics==8.0.73
 ``` 
 dann das Training im Ordner oberhalb des datasets Ordner
 ``` 
-yolo train model=./yolov8n_ultra_tiny.yaml data=./datasets/data.yaml imgsz=320 epochs=50 batch=8 save=True
-``` 
+yolo train model=./fastestiny.yaml data=./datasets/data.yaml imgsz=320 epochs=50 batch=8 save=True
 
-Dann Gewichte extraieren
+``` 
+Die yaml muss im Ordner
+c:\Temp\Training\9k_100Epoch\venv\Lib\site-packages\ultralytics\models\v8\ liegen
+
+Dann Gewichte extraieren -> wird nicjht mehr gebraucht
 extract_weights.py erzeugen mit diesem Inhalt
+ACHTUNG den Pfad richtig setzen
 ``` 
 
 import torch
@@ -76,18 +80,23 @@ model = YOLO('runs/detect/train3/weights/best.pt')
 torch.save(model.model.state_dict(), 'best_weights.pt')
 print("✅ best_weights.pt erfolgreich gespeichert.")
 ``` 
-Dann aufrufen
+Dann aufrufen -> wird nicht mehr gebraucht
 
 python extract_weights.py     
 ``` 
 
 Dann der Export nach onnx
 ```
-python -c "from ultralytics import YOLO; import torch; m=YOLO('yolov8n_ultra_tiny.yaml'); m.model.load_state_dict(torch.load('best_weights.pt')); m.export(format='onnx', imgsz=320, opset=12, dynamic=True, simplify=False)"
+python -c "from ultralytics import YOLO; m=YOLO('best.pt'); m.export(format='onnx', imgsz=320, opset=12, dynamic=False, simplify=True)"
+
 
 ```
-das hier geht nicht
-yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12
+
+Zum Test kann man dann auch noch aufrufen 
+``` 
+
+python test_onnx.py     
+``` 
 
 
 ### Exportieren
