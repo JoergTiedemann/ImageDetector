@@ -1,17 +1,40 @@
 import { memo } from "react";
 
-const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
+const ResultsTable = memo(function ResultsTable({ details, currentClasses,currentImageIndex }) {
+  const bildanalyse = details?.bildanalyse ?? 0;
   const detections = details?.frameDetections || [];
   const uniqueCount = details?.uniqueBerryCount ?? 0;
-  const globalBerries = details?.globalBerryInfo || []; // <- neu
+  const globalBerries = details?.globalBerryInfo || [];
+  // console.log("ResultsTable - Details:", details);
+  var global_reif = 0;
+  var global_unreif =  0;
+  var global_mittelreif = 0;
+  var global_sum = 0;
+  var reif_percent = 0;
 
+  if (details.globalBerryInfo) {
+    if ((bildanalyse > 0) &&  details.globalBerryInfo.classMap) {
+      global_reif = details.globalBerryInfo.classMap.get(0)?? 0;
+      global_unreif = details.globalBerryInfo.classMap.get(2)?? 0;
+      global_mittelreif = details.globalBerryInfo.classMap.get(1)?? 0;
+    }
+    else if (bildanalyse > 0) {
+      global_reif = details.globalBerryInfo[0] ?? 0;
+      global_unreif = details.globalBerryInfo[2] ?? 0;
+      global_mittelreif = details.globalBerryInfo[1] ?? 0;
+    }
+    global_sum = global_reif + global_unreif + global_mittelreif;
+    reif_percent = global_sum > 0 ? Math.round((global_reif / global_sum) * 100) : 0;
+  }
+
+  /* als erstes due Summentitelzeile  */
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <details className="text-gray-200 group">
         <summary className="flex items-center cursor-pointer select-none">
           <div className="flex-1 text-lg sm:text-xl font-bold border-b border-gray-700 pb-2">
-          {globalBerries.classMap?.size !== undefined
-          ? `Gesamtzanzahl Beeren: ${globalBerries.total}`
+          {bildanalyse > 0
+          ? `Reif:${global_reif} (${reif_percent}%) - Mittelreif:${global_mittelreif} - Unreif:${global_unreif} -`
           : `Erkennungsergebnisse – Aktuell (${detections.length}) / Gesamt (${uniqueCount})`}
           </div>
           <div className="text-gray-400">
@@ -32,9 +55,10 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
           </div>
         </summary>
 
+        {/* hier kommt die Detailliste */}
         <div className="transition-all duration-300 ease-in-out transform origin-top group-open:animate-details-show mt-3 sm:mt-4">
           {/* Frame-Detektionen */}
-          {details.frameDetections !== undefined && (
+          {bildanalyse === 0  && (
           <>
           <h3 className="text-gray-300 font-semibold mb-2">Aktueller Frame</h3>
           {detections.length === 0 ? (
@@ -72,25 +96,36 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses }) {
           )}
           </>)}
           {/* Globale Beerenliste */}
-          {globalBerries.classMap?.size !== undefined && (
+          {bildanalyse > 0 && (
             <>
               <h3 className="text-gray-300 font-semibold mb-2">Globale Beerenliste</h3>
                 <div className="overflow-x-auto -mx-3 px-3">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
-                      <tr className="bg-gray-700 text-center">
-                        <th className="p-2 text-xs sm:text-sm">Typ</th>
-                        <th className="p-2 text-xs sm:text-sm">Anzahl</th>
-                      </tr>
+                        <tr className="bg-gray-700 text-center">
+                          <th className="p-2 text-xs sm:text-sm">ID</th>
+                          <th className="p-2 text-xs sm:text-sm">Typ</th>
+                          <th className="p-2 text-xs sm:text-sm">Wahrscheinlichkeit</th>
+                        </tr>
                     </thead>
                     <tbody>
-                      {/* {console.log("Global Berries size:", globalBerries.classMap.size, " Inhalt:", globalBerries)} */}
-                      {Array.from(globalBerries.classMap.entries()).map(([classIdx, count]) => (
-                        <tr key={classIdx}>
-                          <td className="p-2 font-mono text-xs sm:text-sm">
-                            {currentClasses[classIdx] || `Class ${classIdx}`}
+                      {detections.map((item, index) => (
+                        <tr
+                          key={index}
+                          className={
+                            "border-b border-gray-700 transition-colors text-center " +
+                            (item.imageIndex === (currentImageIndex + 1)
+                              ? "text-green-300 hover:text-green-200"
+                              : "text-gray-300 hover:bg-gray-700")
+                          }
+                        >
+                          <td className="p-2 font-mono text-xs sm:text-sm">{item.imageIndex ?? 0}/{item.id ?? -99}</td>
+                          <td className="p-2 text-xs sm:text-sm">
+                            {currentClasses[item.class_idx] || `Class ${item.class_idx}`}
                           </td>
-                          <td className="p-2 text-xs sm:text-sm">{count}</td>
+                          <td className="p-2 text-xs sm:text-sm">
+                            {(item.score * 100).toFixed(1)}%
+                          </td>
                         </tr>
                       ))}
                     </tbody>

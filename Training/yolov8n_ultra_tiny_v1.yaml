@@ -1,0 +1,33 @@
+# Ultra‑Tiny YOLOv8 – iPhone SE Optimized
+# Ziel: <1.5M Parameter, minimale Feature‑Maps, volle YOLOv8‑Kompatibilität
+
+nc: 3
+
+depth_multiple: 0.33
+width_multiple: 0.25
+
+backbone:
+  - [-1, 1, Conv, [16, 3, 2]]      # 160x160
+  - [-1, 1, Conv, [16, 3, 1]]
+  - [-1, 1, C2f, [16, 1]]
+
+  - [-1, 1, Conv, [32, 3, 2]]      # 80x80
+  - [-1, 1, C2f, [32, 1]]
+
+  - [-1, 1, Conv, [64, 3, 2]]      # 40x40
+  - [-1, 1, C2f, [64, 1]]
+
+head:
+  - [-1, 1, SPPF, [64, 5]]
+
+  - [-1, 1, Conv, [32, 1, 1]]
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
+  - [[-1, 4], 1, Concat, [1]]
+  - [-1, 1, C2f, [32, 1]]
+
+  - [-1, 1, Conv, [16, 1, 1]]
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]
+  - [[-1, 2], 1, Concat, [1]]
+  - [-1, 1, C2f, [16, 1]]
+
+  - [[9, 12, 15], 1, Detect, [nc]]

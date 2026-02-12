@@ -17,6 +17,80 @@ Die Anzahl der Epochen bestimmt die Genauigkeit des Modells epochs=50 ist das ab
 Die Imagesize sollte bei 640 gelassen werden 
 Man kann auch auf google Colab trainieren, da stehen leistungsfähige Rechner zur Verfügiung aber nur eingeschränkte Rechenzeit von ca. 1-2Stunden pro Tag
 Ein entsprechend konfiguriertes Colab Notbook befindet sich im Ordner Colab
+### Anmerkungen
+Man kann das Training unterbrechen mit Ctrl-C
+- Ctrl + C ist völlig sicher.
+- man verliert keine Epochen.
+- best.pt und last.pt werden immer gespeichert.
+- man kann jederzeit exportieren.
+- man kann jederzeit weitertrainieren.
+
+Wenn man z. B. nach 30 Epochen abbricht:
+- best.pt = bestes Modell aus Epoche 1–30
+- last.pt = Modell aus Epoche 30
+Beide sind voll exportierbar.
+
+Man kann weitertrainieren mit
+```
+ACHTUNG Pfad beachten
+yolo train resume=TRUE model=runs/detect/train/weights/last.pt 
+Die Parameter data=data.yaml epochs=50 brauchen nicht mit angegeben werden können es aber wenn neue Werte verwendet werden sollen (z.B. anderen Epochs oder oder batch)
+
+```
+
+### Ultratiny Modell on the scratch erzeugen
+man braucht die fastestiny.yaml Datei  
+und man braucht eine Installationsumgebung und Ultraalytics 8.0.73 
+Das ist offensichtlich die letzte Version die custom yaml Dateien zu Architekturdefinition noch akzeptiert
+(Das muss aber nochmal getestet werden)
+``` 
+python -m venv venv
+``` 
+dann
+```
+venv\Scripts\activate
+``` 
+dann 
+``` 
+python -m pip install --upgrade pip
+``` 
+dann
+``` 
+pip install --upgrade "pip<24" "setuptools<70" wheel
+``` 
+dann ultralytics 8.0.73
+``` 
+pip install ultralytics==8.0.73
+``` 
+dann das Training im Ordner oberhalb des datasets Ordner
+``` 
+yolo train model=./fastestiny.yaml data=./datasets/data.yaml imgsz=320 epochs=50 batch=8 save=True
+
+``` 
+Die yaml muss im Ordner
+c:\Temp\Training\9k_100Epoch\venv\Lib\site-packages\ultralytics\models\v8\ liegen, sonst wird eine Standard Yaml genommen und keine Fehlermeldung erzeugt !!!
+
+
+Dann der Export nach onnx
+```
+python -c "from ultralytics import YOLO; m=YOLO('best.pt'); m.export(format='onnx', imgsz=320, opset=12, dynamic=False, simplify=True)"
+```
+
+Zum Test kann man dann auch noch aufrufen 
+``` 
+python test_onnx.py     
+``` 
+
+oder zur Analyse der Onnx Datei
+``` 
+pip install onnx-tool
+``` 
+und dann 
+``` 
+python -m onnx_tool -i best.onnx
+``` 
+Man bekommt eine Tabelle die Forward_MACs und Params  enthaält und am Ende eine Summierung 
+Forward_MACs*2 / 1.000.000.000 gibt die GFLOPS Anzahl die zusammen mit Params entwas über die schwere/Komplexität des Models aussagt 
 
 ### Exportieren
 nach dem Training wird ein Export in das onnx Format benötigt damit die onnxruntime-web engine das Model laden und verarbeiten kann.  
@@ -24,6 +98,51 @@ Hier folgenden Befehl verwenden:
 ``` 
 yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
 ```
+Wenn dort eine andere Imagesize angegeben wird kann man das Modell verschlanken so das es weniger Speicher verbraucht
+Was  durchaus Sinn macht: 320 bringen enorm was, 288 oder 256 bringen auch was aber der Leistungsunterschied ist nicht so gross aber die Fehlerrate steigt
+
+## Weitere Ideen nach Obstbau-Messe York
+### Erkenntnisse
+alle die in Richtung Ernteerkennung was machen benutzen Yolov8n und fast alle das vordefinierte COCO Modell das mit eigenen Daten verfeinert wurde
+Re-Id haben alle als sehr rechen- und speicherintensiv bezeichnet und davon Abstand genommen, die Einzigen die es hinbekommen haben ist die Uni Harburg in Zusammenarbeit mit dem Fraunhofer Institut und dort haben Sie mittels Lidar oder Stereokamera und 4cm GPS Daten jedem Pixel eine 3D GPS Koordinate gegeben
+Am Ende ist Re-ID der Overkill und endet in einer Hardwareschlacht.
+Die Österreicher haben es da sehr einfach gemacht und aus den mit GoPro aufgenommenen Frames einfach das genommen was am meisten Früchte hatte und das haben sie dann hochgerechnet mittels empirisch ermittelten Schätzwerten, ähnlich hat es auch die Uni in Michigan gemacht in dem sie jedenStrauch angeflogen haben und nur 1 Foto pro Strauch gemacht haben.
+Die Österreicher sind dann auf Genauigkeiten > 85% gekommen
+
+### wie machen wir weiter
+
+Für Ernteprognose d.h. wieviel Prozent sind reif mittelreif und unreif ist die absolute Menge auch vollkommen irrelevant
+Für die Mengenprognose kann auch ein Bild oder der Frame mit den meisten Früchten aufgenommen werden und dann hochgerechnet werden, Ideal wäre es wenn verschiedene Szenen/Aufnahmeblickwinkel erkannt würden und dann daraus die Summe gebildet wird und hochgerechnet wird aber vermutlich ist das gar nicht notwendig
+Gleiches gilt für die Blütenerkennung nur das man hier vermutlich andere Faktoren braucht
+
+Am Ende wollen wir 3 Dinge machen
+* Reifeprognose
+* kurzfristige Mengenprognose der Beeren
+* mittelfristige erwartete Ernte über Blüten
+
+Dafür brauchen wir vermutlich 3 Schätzfaktoren und die Frage ist ob wir das aus den Framestream machen oder aus Bildern 
+Beides müsste zum Ziel führen hat aber vermutlich unteschiedliche Genauigkeiten
+Die Frage ist ob wir beides implementieren
+Der Ansatz : Nimm die Frames und von denen die mit der größten Stückzahl und dann Faktor (mindesten 2) ist gut 
+die Alternative Nimm 4 oder 8 Fotos des Strauchs und zähle und dann Faktor ist auch gut, die Frage ist was genauer ist und was wann gemacht werden soll
+Re-Id können wir auf jeden Fall wieder ausbauen 
+
+### Erkenntnisse beim Test der verschiedenen Modelle und weiteres ToDo
+es wurden jeweils die ersten 17 Bilder des 9K Trainingsmodells getestet auf Notebook 
+* Imagesize 640: 204 Beeren erkannt Inferenzzeit Bild 17: 80ms
+* Imagesize 320: 150 Beeren erkannt Inferenzzeit Bild 17: 36,9ms
+* Imagesize 288: 148 Beeren erkannt Inferenzzeit Bild 17: 37,2ms
+* Imagesize 256: 144 Beeren erkannt Inferenzzeit Bild 17: 30ms
+* Imagesize 320 Minimalmodell nach 4 Epochen: 98 Beeren erkannt Inferenzzeit Bild 17: 26-31ms
+* Imagesize 640 berry2k_100: 147 Beeren erkannt Inferenzzeit Bild 17: ca 1000ms -> hier scheint irgendwas nicht zu stimmen
+
+weiteres ToDo
+* testen wie das minimalmodell erkennt wenn das Training 50 oder 100 Epochen hinter sich hat
+* noch testen wie das auf einem iphone aussieht
+* wir haben das Training gemacht und die yaml beim Training angegeben aber sie lag nicht da wo sie hin soll, sondern im Ordner wo das Training gestartet wurde, und da kam ein Modell raus was grosse Rechenzeiten hatte aber was deutlich kleiner war als das Ursprungsmodell
+das müssen wir noch näher untersuchen
+
+
 
 # Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild
 Man braucht kein Tracking, sondern globale Wiedererkennung.  

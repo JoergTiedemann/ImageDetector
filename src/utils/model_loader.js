@@ -56,8 +56,11 @@ export async function detectBackend() {
   return "wasm";
 }
 
-export async function model_loadernew(model_path) {
+export async function model_loadernew(model_path,imgsz_type) {
   const DEFAULT_INPUT_SIZE = [1, 3, 640, 640];
+  const DEFAULT_INPUT_SIZE_320 = [1, 3, 320, 320];
+  const DEFAULT_INPUT_SIZE_288 = [1, 3, 288, 288];
+  const DEFAULT_INPUT_SIZE_256 = [1, 3, 256, 256];
 
   // Hilfsfunktion: prüft ob WebGPU wirklich nutzbar ist
   async function canUseWebGPU() {
@@ -80,15 +83,46 @@ export async function model_loadernew(model_path) {
         executionProviders: ["webgpu"],
       });
 
-      console.log("WebGPU Session erstellt, starte Warmup…");
-      const dummy = new Tensor(
-        "float32",
-        new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
-        DEFAULT_INPUT_SIZE
-      );
-      await session.run({ images: dummy });
-      dummy.dispose();
+      console.log("Input name:", session.inputNames[0]);
+      // console.log("imgsz_type:", imgsz_type);
 
+      // console.log("WebGPU Session erstellt, starte Warmup…");
+
+      if (imgsz_type === "zeroPad320") {
+        // console.log("WebGPU Session erstellt, starte Warmup… mit 320x320 Dummy Input");
+        const dummy = new Tensor(
+          "float32",
+          new Float32Array(DEFAULT_INPUT_SIZE_320.reduce((a, b) => a * b)),
+          DEFAULT_INPUT_SIZE_320
+        );
+        await session.run({ images: dummy });
+        dummy.dispose();
+      } else if (imgsz_type === "zeroPad288") {
+        const dummy = new Tensor(
+          "float32",
+          new Float32Array(DEFAULT_INPUT_SIZE_288.reduce((a, b) => a * b)),
+          DEFAULT_INPUT_SIZE_288
+        );
+        await session.run({ images: dummy });
+        dummy.dispose();
+      } else if (imgsz_type === "zeroPad256") {
+        const dummy = new Tensor(
+          "float32",
+          new Float32Array(DEFAULT_INPUT_SIZE_256.reduce((a, b) => a * b)),
+          DEFAULT_INPUT_SIZE_256
+        );
+        await session.run({ images: dummy });
+        dummy.dispose();
+      } else {
+        // Fallback: Standard 640x640 Dummy Input 
+        const dummy = new Tensor(
+          "float32",
+          new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
+          DEFAULT_INPUT_SIZE
+        );
+        await session.run({ images: dummy });
+        dummy.dispose();
+      }
       console.log("Erfolgreich geladen mit Provider: webgpu");
       return { yolo_model: session, provider: "webgpu" };
     } catch (err) {
@@ -108,20 +142,30 @@ export async function model_loadernew(model_path) {
   });
 
   console.log("WASM Session erstellt, starte Warmup…");
-  const dummy = new Tensor(
-    "float32",
-    new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
-    DEFAULT_INPUT_SIZE
-  );
-  await session.run({ images: dummy });
-  dummy.dispose();
-
+  if (imgsz_type === "zeroPad320") {
+    const dummy = new Tensor(
+      "float32",
+      new Float32Array(DEFAULT_INPUT_SIZE_320.reduce((a, b) => a * b)),
+      DEFAULT_INPUT_SIZE_320
+    );
+    await session.run({ images: dummy });
+    dummy.dispose();
+  } else {
+    const dummy = new Tensor(
+      "float32",
+      new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
+      DEFAULT_INPUT_SIZE
+    );
+    await session.run({ images: dummy });
+    dummy.dispose();
+  }
   console.log("Erfolgreich geladen mit Provider: wasm");
   return { yolo_model: session, provider: "wasm" };
 }
 
-export async function model_loader(model_path, backend) {
+export async function model_loader(model_path, backend,imgsz_type) {
   const DEFAULT_INPUT_SIZE = [1, 3, 640, 640];
+  const DEFAULT_INPUT_SIZE_320 = [1, 3, 320, 320];
 
   // load model
   const yolo_model = await InferenceSession.create(model_path, {
@@ -129,14 +173,25 @@ export async function model_loader(model_path, backend) {
   });
 
   // warm up
-  const dummy_input_tensor = new Tensor(
-    "float32",
-    new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
-    DEFAULT_INPUT_SIZE
-  );
-  const { output0 } = await yolo_model.run({ images: dummy_input_tensor });
-  output0.dispose();
-  dummy_input_tensor.dispose();
+  if (imgsz_type === "zeroPad320") {
+    const dummy_input_tensor = new Tensor(
+      "float32",
+      new Float32Array(DEFAULT_INPUT_SIZE_320.reduce((a, b) => a * b)),
+      DEFAULT_INPUT_SIZE_320
+    );
+    const { output0 } = await yolo_model.run({ images: dummy_input_tensor });
+    output0.dispose();
+    dummy_input_tensor.dispose();
+  } else {
+      const dummy_input_tensor = new Tensor(
+        "float32",
+        new Float32Array(DEFAULT_INPUT_SIZE.reduce((a, b) => a * b)),
+        DEFAULT_INPUT_SIZE
+      );
+      const { output0 } = await yolo_model.run({ images: dummy_input_tensor });
+      output0.dispose();
+      dummy_input_tensor.dispose();
+  }
  return {  yolo_model:yolo_model, provider: backend };
   // return yolo_model;
 }
@@ -151,7 +206,6 @@ export async function load_modelEmbedding(modelPath, backend = "wasm") {
 
   // Fallback-Dims
   let dims = [1, 3, 128, 128];
-
   // Dummy erzeugen
   let dummy = new Tensor(
     "float32",
@@ -164,6 +218,7 @@ export async function load_modelEmbedding(modelPath, backend = "wasm") {
 
   // Jetzt erneut Metadata lesen
   const meta = session.inputMetadata[inputName];
+//  console.log("metadata:", meta  );
   if (meta && meta.dimensions) {
     dims = meta.dimensions.map(d => (typeof d === "number" ? d : 1));
   }
