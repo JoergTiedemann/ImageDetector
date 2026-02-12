@@ -245,7 +245,7 @@ const loadModel = useCallback(async () => {
       yolo_model = result.yolo_model;
       provider = result.provider;
     }
-    console.log("Ende Model laden");
+    // console.log("Ende Model laden");
     backend = provider;
     const end = performance.now();
 

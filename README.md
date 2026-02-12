@@ -99,7 +99,7 @@ Hier folgenden Befehl verwenden:
 yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
 ```
 Wenn dort eine andere Imagesize angegeben wird kann man das Modell verschlanken so das es weniger Speicher verbraucht
-Was  durchaus Sinn macht 320 bringen enorm was, 288 oder 256 bringen auch was das muss aber noch ausprobiert werden
+Was  durchaus Sinn macht: 320 bringen enorm was, 288 oder 256 bringen auch was aber der Leistungsunterschied ist nicht so gross aber die Fehlerrate steigt
 
 ## Weitere Ideen nach Obstbau-Messe York
 ### Erkenntnisse
@@ -126,6 +126,23 @@ Die Frage ist ob wir beides implementieren
 Der Ansatz : Nimm die Frames und von denen die mit der größten Stückzahl und dann Faktor (mindesten 2) ist gut 
 die Alternative Nimm 4 oder 8 Fotos des Strauchs und zähle und dann Faktor ist auch gut, die Frage ist was genauer ist und was wann gemacht werden soll
 Re-Id können wir auf jeden Fall wieder ausbauen 
+
+### Erkenntnisse beim Test der verschiedenen Modelle und weiteres ToDo
+es wurden jeweils die ersten 17 Bilder des 9K Trainingsmodells getestet auf Notebook 
+* Imagesize 640: 204 Beeren erkannt Inferenzzeit Bild 17: 80ms
+* Imagesize 320: 150 Beeren erkannt Inferenzzeit Bild 17: 36,9ms
+* Imagesize 288: 148 Beeren erkannt Inferenzzeit Bild 17: 37,2ms
+* Imagesize 256: 144 Beeren erkannt Inferenzzeit Bild 17: 30ms
+* Imagesize 320 Minimalmodell nach 4 Epochen: 98 Beeren erkannt Inferenzzeit Bild 17: 26-31ms
+* Imagesize 640 berry2k_100: 147 Beeren erkannt Inferenzzeit Bild 17: ca 1000ms -> hier scheint irgendwas nicht zu stimmen
+
+weiteres ToDo
+* testen wie das minimalmodell erkennt wenn das Training 50 oder 100 Epochen hinter sich hat
+* noch testen wie das auf einem iphone aussieht
+* wir haben das Training gemacht und die yaml beim Training angegeben aber sie lag nicht da wo sie hin soll, sondern im Ordner wo das Training gestartet wurde, und da kam ein Modell raus was grosse Rechenzeiten hatte aber was deutlich kleiner war als das Ursprungsmodell
+das müssen wir noch näher untersuchen
+
+
 
 # Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild
 Man braucht kein Tracking, sondern globale Wiedererkennung.  
