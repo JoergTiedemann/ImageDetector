@@ -1,5 +1,6 @@
 import cv from "@techstark/opencv-js";
-import { Tensor } from "onnxruntime-web/webgpu";
+// import { Tensor } from "onnxruntime-web/webgpu";
+import { Tensor } from "onnxruntime-web";
 
 /**
  * Pre-process input image.
