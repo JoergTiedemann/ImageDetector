@@ -2,10 +2,8 @@ import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { model_loader,model_loadernew,load_modelEmbedding,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
-import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
-import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { Berries,countBerryArrayByClass} from "./tracking/BerryMatcher";
-import { berryReIdManager,countBerriesByClass,countBerriesConfirmed } from "./tracking/berryReIdManager"; 
+import { render_overlay} from "./utils/render_overlay";
+import { countBerryArrayByClass} from "./tracking/BerryMatcher";
 
 
 import classes from "./utils/yolo_classes.json";
@@ -15,6 +13,15 @@ const appVersion = packageJson.version;
 const isIPhoneSE = isIPhoneSEDevice();
 let inputCanvas = null;
 let ctx = null;
+
+// Globales Objekt für die maximale Anzahl an Boundingboxes pro Frame
+let MaxValues = {
+  MaxBerryCount: 0,
+  ReifBerryCount: 0,
+  UnReifBerryCount: 0,
+  HalbReifBerryCount: 0,
+};
+
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -61,6 +68,7 @@ useEffect(() => {
       console.log("Eruda Debug-Konsole aktiviert (iPhone Safari)");
     };
     document.body.appendChild(script);
+
   }
 }, []);
 
@@ -102,11 +110,8 @@ useEffect(() => {
   const classFileSelectedRef = useRef(null);
   // const [currentClasses, setCurrentClasses] = useState(classes);
 
-  // Worker
-  const videoWorkerRef = useRef(null);
 
   // Tracking
-  const berriesRef = useRef(new Berries());
   const frameIndexRef = useRef(0);
 
 // Init page
@@ -450,104 +455,6 @@ const loadModel = useCallback(async () => {
     }
   }, []);
 
-// ================= Hilfsfunktionen =================
-
-function iou(boxA, boxB) {
-  const [ax, ay, aw, ah] = boxA;
-  const [bx, by, bw, bh] = boxB;
-
-  const x1 = Math.max(ax, bx);
-  const y1 = Math.max(ay, by);
-  const x2 = Math.min(ax + aw, bx + bw);
-  const y2 = Math.min(ay + ah, by + bh);
-
-  const interW = Math.max(0, x2 - x1);
-  const interH = Math.max(0, y2 - y1);
-  const inter = interW * interH;
-  if (inter === 0) return 0;
-
-  const areaA = aw * ah;
-  const areaB = bw * bh;
-  return inter / (areaA + areaB - inter);
-}
-
-function mergeOverlappingDetections(dets, iouThresh = 0.6) {
-  const kept = [];
-  for (const det of dets) {
-    let merged = false;
-    for (const k of kept) {
-      if (det.class_idx !== k.class_idx) continue;
-      if (iou(det.bbox, k.bbox) > iouThresh) {
-        // nimm die mit höherem Score
-        if (det.score > k.score) {
-          k.bbox = det.bbox;
-          k.score = det.score;
-        }
-        merged = true;
-        break;
-      }
-    }
-    if (!merged) kept.push({ ...det });
-  }
-  return kept;
-}
-
-function computeColorHistogram(ctx, det, bins = 32) {
-  let [x, y, w, h] = det.bbox;
-
-  // Pixel-Koordinaten runden
-  x = Math.floor(x);
-  y = Math.floor(y);
-  w = Math.floor(w);
-  h = Math.floor(h);
-
-  if (w < 2 || h < 2) {
-    return new Array(bins).fill(1 / bins);
-  }
-
-  const imgData = ctx.getImageData(x, y, w, h);
-  const data = imgData.data;
-  const hist = new Array(bins).fill(0);
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] / 255;
-    const g = data[i + 1] / 255;
-    const b = data[i + 2] / 255;
-
-    // komplett schwarze Pixel überspringen (vermeidet Hue-NaN)
-    if (r === 0 && g === 0 && b === 0) continue;
-
-    const hue = rgbToHue(r, g, b); // Wert in [0,1] erwartet
-    if (Number.isNaN(hue)) continue;
-
-    let bin = Math.floor(hue * bins);
-    if (bin < 0) bin = 0;
-    if (bin >= bins) bin = bins - 1;
-
-    hist[bin] += 1;
-  }
-
-  const sum = hist.reduce((a, b) => a + b, 0);
-
-  // WICHTIG: sum==0 absichern → sonst NaN
-  if (sum === 0) {
-    return new Array(bins).fill(1 / bins);
-  }
-
-  return hist.map(v => v / sum);
-}
-
-function rgbToHue(r, g, b) {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-
-  if (d === 0) return 0;
-  if (max === r) return ((g - b) / d) % 6;
-  if (max === g) return (b - r) / d + 2;
-  return (r - g) / d + 4;
-}
-
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
@@ -559,23 +466,23 @@ function rgbToHue(r, g, b) {
       overlayRef.current.height = 0;
       isCameraActiveRef.current = false;
 
-      // const result = countBerriesByClass(berryReIdManager);
       // console.log("Endergebnis:", result);
       // Ausgabe: { unreif: X, mittelreif: Y, reif: Z }
-      setDetails({
-        bildanalyse: 0,
-        // frameDetections: tracked,
-        // uniqueBerryCount: berries.items.length,
-        globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
-      });
+      // setDetails({
+      //   bildanalyse: 0,
+      //   // frameDetections: tracked,
+      //   // uniqueBerryCount: berries.items.length,
+      //   globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
+      // });
       // setDetails([]);
       setActiveFeature(null);
     } else {
+      // MaxValues initialisieren
+      MaxValues.MaxBerryCount = 0;
+      MaxValues.ReifBerryCount = 0;
+      MaxValues.UnReifBerryCount = 0;
+      MaxValues.HalbReifBerryCount = 0;
       // open camera
-      //erstmal alle bisherigen getrackten Beeren löschen
-      berryReIdManager.reset();
-      // berriesRef.current.items = [];
-      // berriesRef.current.nextId = 1;
       isCameraActiveRef.current = true;
       try {
         setProcessingStatus((prev) => ({
@@ -724,82 +631,49 @@ function rgbToHue(r, g, b) {
         overlayCtx.canvas.height
       );
 
-      // -------- Re-ID Tracking --------
-      frameIndexRef.current += 1;
-      const frameIndex = frameIndexRef.current;
       const tracked = [];
 
-      // 1. YOLO-Filter
-      // kleine Boxen (w oder h < 20px) und schwache Scores (score < 0.5) werden gefiltert
-      let filtered = results.bbox_results.filter(det => {
-        if (det.score < 0.5) return false;
-        const [x, y, w, h] = det.bbox;
-        if (w < 20 || h < 20) return false;
-        return true;
-      });
+      // Overlay
+      render_overlay(results, overlayCtx, modelConfigRef.current.classes);
 
-      // 2. Merge
-      // bounding boxes, die sich stark überlappen (IoU > 0.6) und zur selben Klasse gehören, werden gemerged (nämlich die mit dem höheren Score behalten)
-      filtered = mergeOverlappingDetections(filtered);
-
-      // 3. Re-ID Matching
-      if (embeddingSessionRef.current && embeddingSessionRef.current.session) {
-        for (const det of filtered) {
-          // --- Embedding extrahieren ---
-          const embedding = await computeBerryEmbedding(
-            ctx,
-            det,
-            embeddingSessionRef.current.session
-          );
-          // 🔍 HIER: Raw YOLO Bounding Box loggen
-          // console.log("Raw bbox:", det.bbox);
-
-
-          // --- Color Histogram extrahieren -
-          const colorHist = computeColorHistogram(ctx, det);
-
-          // --- Größe extrahieren ---
-          const [x, y, w, h] = det.bbox;
-          const size = w * h;
-
-          // ------------------------------
-          // 🔍 DEBUG LOGS HIER EINBAUEN
-          // ------------------------------
-          // console.log("---- DEBUG FRAME", frameIndex, "----");
-          // console.log("Embedding length:", embedding.length);
-          // console.log("Embedding sample:", embedding.slice(0, 5));
-          // console.log("ColorHist sample:", colorHist.slice(0, 5));
-          // console.log("Size:", size);
-
-
-          const match = berryReIdManager.processDetection(
-            { embedding, colorHist, size, class_idx: det.class_idx },
-            frameIndex,
-             modelConfigRef.current.repeatFrameCount // <-- hier übergeben
-          );
-
+        let id = 0;
+      for (const det of results.bbox_results) {
+          id++;
           tracked.push({
             ...det,
-            id: match.id,
-            confirmed: match.confirmed,
-            similarity: match.score,
-            isNew: match.isNew,
-            imageWidth: ctx.canvas.width,
-            imageHeight: ctx.canvas.height
+            id,
+            imageWidth: overlayCtx.canvas.width,
+            imageHeight: overlayCtx.canvas.height
           });
-        }
-      }
 
-      // Overlay
-      if (isCameraActiveRef.current) {
-        render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
-
-        setDetails({
+        const detObj = {
           bildanalyse: 0,
           frameDetections: tracked,
-          // uniqueBerryCount: berryReIdManager.archive.length
-          uniqueBerryCount: countBerriesConfirmed(berryReIdManager).total
-        });
+          uniqueBerryCount: tracked.length,
+          globalBerryInfo: countBerryArrayByClass(results.bbox_results)
+        };
+
+        // nun die Maxwerte aktualisieren, wenn die aktuelle Anzahl an Boundingboxes größer ist
+        // console.log(`Aktuelle Berry-Anzahl: ${results.bbox_results.length}, MaxBerryCount bisher: ${MaxValues.MaxBerryCount}`);
+        if (results.bbox_results.length >  MaxValues.MaxBerryCount) {
+          MaxValues.MaxBerryCount = results.bbox_results.length;
+          let allGlobalBerryInfo = {};
+
+          if (detObj.globalBerryInfo && detObj.globalBerryInfo.classMap) {
+            const classMap = detObj.globalBerryInfo.classMap;
+            // Map-Objekt
+            for (const [key, value] of classMap.entries()) {
+              // console.log(`Kumulieren Klasse (Map) ${key}:`, value);
+              allGlobalBerryInfo[key] = (allGlobalBerryInfo[key] || 0) + value;
+            }
+            MaxValues.ReifBerryCount= (allGlobalBerryInfo[0] || 0);
+            MaxValues.UnReifBerryCount=(allGlobalBerryInfo[1] || 0);
+            MaxValues.HalbReifBerryCount=(allGlobalBerryInfo[2] || 0);
+        console.log(`Max Berries:${MaxValues.MaxBerryCount} Reif:`, MaxValues.ReifBerryCount, "Unreif:", MaxValues.UnReifBerryCount, "HalbReif:", MaxValues.HalbReifBerryCount);
+          }
+        }
+
+        setDetails(detObj);
       }
 
       setProcessingStatus(prev => ({

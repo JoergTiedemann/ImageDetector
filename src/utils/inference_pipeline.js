@@ -26,7 +26,7 @@ export async function inference_pipeline(
   model_config
 ) {
   try {
-    console.log("Image source:", imageSource," Session:",session," Overlay size:",overlay_size," Model config:",model_config);
+    // console.log("Image source:", imageSource," Session:",session," Overlay size:",overlay_size," Model config:",model_config);
     // Read DOM to cv.Mat
     let src_mat;
     if (imageSource instanceof OffscreenCanvas) {

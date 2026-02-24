@@ -28,46 +28,6 @@ export async function render_overlay(
   );
 }
 
-function heatColor(value, max) {
-  const ratio = Math.min(value / max, 1);
-
-  if (ratio < 0.33) return "rgba(0, 200, 0, 0.9)";      // grün
-  if (ratio < 0.66) return "rgba(255, 165, 0, 0.9)";    // orange
-  return "rgba(255, 0, 0, 0.9)";                        // rot
-}
-
-
-export function render_overlaytracked(tracked, ctx, classes) {
-  ctx.lineWidth = 2;
-  ctx.font = "14px Arial";
-  ctx.textBaseline = "top";
-
-  for (const det of tracked) {
-    // Annahme: det.bbox = [x, y, w, h]
-    const [x, y, w, h] = det.bbox;
-
-    // Box zeichnen
-    // ctx.strokeStyle = det.isNew ? "yellow" : "lime";
-    ctx.strokeStyle = det.confirmed === false  ? "yellow" : "lime";
-    ctx.strokeRect(x, y, w, h);
-
-    // Debug-Text
-    // const idText = `ID: ${det.id}${det.isNew ? " (new)" : ""}`;
-    // const simText = det.similarity !== null && det.similarity !== undefined
-    //   ? `Sim: ${det.similarity.toFixed(2)}`
-    //   : "Sim: -";
-
-    // ctx.fillStyle = "rgba(0,0,0,0.6)";
-    // ctx.fillRect(x, y - 30, 120, 30);
-
-    // ctx.fillStyle = "white";
-    // ctx.fillText(idText, x + 4, y - 28);
-    // ctx.fillText(simText, x + 4, y - 14);
-  }
-}
-
-
-
 
 /**
  * Draw object detection results
