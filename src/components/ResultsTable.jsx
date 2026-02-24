@@ -12,30 +12,38 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses,curren
   var global_sum = 0;
   var reif_percent = 0;
 
-  if (details.globalBerryInfo) {
-    if ((bildanalyse > 0) &&  details.globalBerryInfo.classMap) {
-      global_reif = details.globalBerryInfo.classMap.get(0)?? 0;
-      global_unreif = details.globalBerryInfo.classMap.get(2)?? 0;
-      global_mittelreif = details.globalBerryInfo.classMap.get(1)?? 0;
-    }
-    else if (bildanalyse > 0) {
-      global_reif = details.globalBerryInfo[0] ?? 0;
-      global_unreif = details.globalBerryInfo[2] ?? 0;
-      global_mittelreif = details.globalBerryInfo[1] ?? 0;
-    }
-    global_sum = global_reif + global_unreif + global_mittelreif;
+  if (bildanalyse == 0){
+    // wir zeigen die Ergebnisse des laufenden Kamerastreams an
+    global_sum = uniqueCount;
+    global_reif = details?.reifCount ?? 0;
+    global_unreif = details?.unreifCount ?? 0;
+    global_mittelreif = details?.halbReifCount ?? 0;
     reif_percent = global_sum > 0 ? Math.round((global_reif / global_sum) * 100) : 0;
   }
-
+  else
+  {
+    if (details.globalBerryInfo) {
+      if ((bildanalyse > 0) &&  details.globalBerryInfo.classMap) {
+        global_reif = details.globalBerryInfo.classMap.get(0)?? 0;
+        global_unreif = details.globalBerryInfo.classMap.get(2)?? 0;
+        global_mittelreif = details.globalBerryInfo.classMap.get(1)?? 0;
+      }
+      else if (bildanalyse > 0) {
+        global_reif = details.globalBerryInfo[0] ?? 0;
+        global_unreif = details.globalBerryInfo[2] ?? 0;
+        global_mittelreif = details.globalBerryInfo[1] ?? 0;
+      }
+      global_sum = global_reif + global_unreif + global_mittelreif;
+      reif_percent = global_sum > 0 ? Math.round((global_reif / global_sum) * 100) : 0;
+    }
+  }
   /* als erstes due Summentitelzeile  */
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <details className="text-gray-200 group">
         <summary className="flex items-center cursor-pointer select-none">
           <div className="flex-1 text-lg sm:text-xl font-bold border-b border-gray-700 pb-2">
-          {bildanalyse > 0
-          ? `Reif:${global_reif} (${reif_percent}%) - Mittelreif:${global_mittelreif} - Unreif:${global_unreif} -`
-          : `Erkennungsergebnisse – Aktuell (${detections.length}) / Gesamt (${uniqueCount})`}
+          {`Reif:${global_reif} (${reif_percent}%) - Mittelreif:${global_mittelreif} - Unreif:${global_unreif}`}
           </div>
           <div className="text-gray-400">
             <svg
@@ -60,40 +68,43 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses,curren
           {/* Frame-Detektionen */}
           {bildanalyse === 0  && (
           <>
-          <h3 className="text-gray-300 font-semibold mb-2">Aktueller Frame</h3>
-          {detections.length === 0 ? (
-            <div className="bg-gray-700 rounded-lg p-4 text-center mb-4">
-              <p className="text-gray-400">Keine Objekte erkannt</p>
-            </div>
-          ) : (
+          <h3 className="text-gray-300 font-semibold mb-2">Reifegradprognose</h3>
             <div className="overflow-x-auto -mx-3 px-3 mb-6">
               <table className="w-full border-collapse min-w-full">
                 <thead>
                   <tr className="bg-gray-700 text-center">
-                    <th className="p-2 text-xs sm:text-sm">ID</th>
+                    <th className="p-2 text-xs sm:text-sm">Anzahl</th>
                     <th className="p-2 text-xs sm:text-sm">Typ</th>
-                    <th className="p-2 text-xs sm:text-sm">Wahrscheinlichkeit</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {detections.map((item, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300 text-center"
-                    >
-                      <td className="p-2 font-mono text-xs sm:text-sm">{item.id ?? -99}</td>
-                      <td className="p-2 text-xs sm:text-sm">
-                        {currentClasses[item.class_idx] || `Class ${item.class_idx}`}
+                    <tr className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300 text-center">
+                      <td className="p-2 font-mono text-xs sm:text-sm"> 
+                        {global_reif}
                       </td>
                       <td className="p-2 text-xs sm:text-sm">
-                        {(item.score * 100).toFixed(1)}%
+                        {currentClasses[0] || `Class ${0}`}
                       </td>
                     </tr>
-                  ))}
+                    <tr className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300 text-center">
+                      <td className="p-2 font-mono text-xs sm:text-sm"> 
+                        {global_mittelreif}
+                      </td>
+                      <td className="p-2 text-xs sm:text-sm">
+                        {currentClasses[1] || `Class ${1}`}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-700 hover:bg-gray-700 transition-colors text-gray-300 text-center">
+                      <td className="p-2 font-mono text-xs sm:text-sm"> 
+                        {global_unreif}
+                      </td>
+                      <td className="p-2 text-xs sm:text-sm">
+                         {currentClasses[2] || `Class ${2}`} 
+                      </td>
+                    </tr>
                 </tbody>
               </table>
             </div>
-          )}
           </>)}
           {/* Globale Beerenliste */}
           {bildanalyse > 0 && (

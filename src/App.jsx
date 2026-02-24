@@ -632,10 +632,7 @@ const loadModel = useCallback(async () => {
             imageHeight: overlayCtx.canvas.height
           });
 
-        const detObj = {
-          bildanalyse: 0,
-          frameDetections: tracked,
-          uniqueBerryCount: tracked.length,
+        const detg = {
           globalBerryInfo: countBerryArrayByClass(results.bbox_results)
         };
 
@@ -645,21 +642,27 @@ const loadModel = useCallback(async () => {
           MaxValues.MaxBerryCount = results.bbox_results.length;
           let allGlobalBerryInfo = {};
 
-          if (detObj.globalBerryInfo && detObj.globalBerryInfo.classMap) {
-            const classMap = detObj.globalBerryInfo.classMap;
+          if (detg.globalBerryInfo && detg.globalBerryInfo.classMap) {
+            const classMap = detg.globalBerryInfo.classMap;
             // Map-Objekt
             for (const [key, value] of classMap.entries()) {
               // console.log(`Kumulieren Klasse (Map) ${key}:`, value);
               allGlobalBerryInfo[key] = (allGlobalBerryInfo[key] || 0) + value;
             }
             MaxValues.ReifBerryCount= (allGlobalBerryInfo[0] || 0);
-            MaxValues.UnReifBerryCount=(allGlobalBerryInfo[1] || 0);
-            MaxValues.HalbReifBerryCount=(allGlobalBerryInfo[2] || 0);
-        console.log(`Max Berries:${MaxValues.MaxBerryCount} Reif:`, MaxValues.ReifBerryCount, "Unreif:", MaxValues.UnReifBerryCount, "HalbReif:", MaxValues.HalbReifBerryCount);
+            MaxValues.UnReifBerryCount=(allGlobalBerryInfo[2] || 0);
+            MaxValues.HalbReifBerryCount=(allGlobalBerryInfo[1] || 0);
+            console.log(`Max Berries:${MaxValues.MaxBerryCount} Reif:`, MaxValues.ReifBerryCount, "Unreif:", MaxValues.UnReifBerryCount, "HalbReif:", MaxValues.HalbReifBerryCount);
+            const detObj = {
+              bildanalyse: 0,
+              uniqueBerryCount: MaxValues.MaxBerryCount,
+              reifCount: MaxValues.ReifBerryCount,
+              unreifCount: MaxValues.UnReifBerryCount,
+              halbReifCount: MaxValues.HalbReifBerryCount,
+            };
+            setDetails(detObj);
           }
         }
-
-        setDetails(detObj);
       }
 
       setProcessingStatus(prev => ({
