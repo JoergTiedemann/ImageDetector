@@ -82,7 +82,6 @@ useEffect(() => {
   const cameraSelectorRef = useRef(null);
   const imgszTypeSelectorRef = useRef(null);
   const sessionRef = useRef(null);
-  const modelCache = useRef({});
   const [multiImageUrls, setMultiImageUrls] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -111,17 +110,9 @@ useEffect(() => {
   // const [currentClasses, setCurrentClasses] = useState(classes);
 
 
-  // Tracking
-  const frameIndexRef = useRef(0);
-
 // Init page
   useEffect(() => {
     loadModel();
-
-    // getCameras();
-
-    // videoWorker.onmessage = videoWorkerMessage;
-    // videoWorkerRef.current = videoWorker;
   }, []);
 
   // Zusätzlich: beim Verlassen der Seite Session freigeben
@@ -136,7 +127,6 @@ useEffect(() => {
           console.warn("Fehler beim Freigeben beim Unload:", err);
         }
       }
-      modelCache.current = {};
     };
     window.addEventListener("beforeunload", cleanup);
     return () => window.removeEventListener("beforeunload", cleanup);
@@ -173,7 +163,6 @@ const loadModel = useCallback(async () => {
       }
       embeddingSessionRef.current = null;
     }
-    modelCache.current = {};
 
     setProcessingStatus(prev => ({
       ...prev,
@@ -224,9 +213,6 @@ const loadModel = useCallback(async () => {
     const end = performance.now();
 
     sessionRef.current = yolo_model;
-    // Chache wollen wir nicht
-    // const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
-    // modelCache.current[cacheKey] = yolo_model;
 
     // Embedding-Modell laden
     try {
