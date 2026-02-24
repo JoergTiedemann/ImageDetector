@@ -285,68 +285,6 @@ const loadModel = useCallback(async () => {
 }, [customModels]);
 
 
-  // Button add model
-  const handle_AddModel = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const fileName = file.name.replace(".onnx", "");
-      const fileUrl = URL.createObjectURL(file);
-      setCustomModels((prevModels) => [
-        ...prevModels,
-        { name: fileName, url: fileUrl },
-      ]);
-    }
-  }, []);
-
-  // Button add classes file
-  const handle_AddClassesFile = useCallback((event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const jsonData = JSON.parse(e.target.result);
-
-        const fileName = file.name.replace(/\.json$/i, "");
-        setCustomClasses((prev) => [
-          ...prev,
-          { name: fileName, data: jsonData },
-        ]);
-
-        setProcessingStatus((prev) => ({
-          ...prev,
-          statusMsg: `Classes file "${fileName}" loaded successfully`,
-          statusColor: "green",
-        }));
-      } catch (error) {
-        console.error("Error parsing JSON file:", error);
-        setProcessingStatus((prev) => ({
-          ...prev,
-          statusMsg: error.message || "Error parsing JSON file",
-          statusColor: "red",
-        }));
-      }
-    };
-
-    reader.onerror = () => {
-      setProcessingStatus((prev) => ({
-        ...prev,
-        statusMsg: "Failed to read file",
-        statusColor: "red",
-      }));
-    };
-
-    reader.readAsText(file);
-  }, []);
-
-  // Button Close Video
-  const handle_CloseVideo = useCallback(() => {
-    setVideoSrc(null);
-    setActiveFeature(null);
-    loadModel();
-  }, []);
-
   // Button Upload Image
   // Mehrfachauswahl: mehrere Bilder nacheinander laden und erkennen
   const handle_OpenImage = useCallback(
@@ -905,37 +843,7 @@ function rgbToHue(r, g, b) {
     requestAnimationFrame(handle_frame_continuous);
   }, [sessionRef.current]);
 
-  // Button Upload Video
-  const handle_OpenVideo = useCallback( async (file) => {
-    if (file) {
   
-      // Worker ggf. neu starten -> vorher beenden
-      if (videoWorkerRef.current) {
-        console.log("Beende alten Video Worker");
-        videoWorkerRef.current.postMessage({ type: "cleanup" });
-        // videoWorkerRef.current.terminate();
-      }
-      const videoWorker = new Worker(
-        new URL("./utils/video_process_worker.js", import.meta.url),
-        { type: "module" }
-      );
-      videoWorker.onmessage = videoWorkerMessage;
-      videoWorkerRef.current = videoWorker;
-      console.log("Starte Video Worker aus main thread");
-      videoWorkerRef.current.postMessage(
-        {
-          file: file,
-          modelConfig: modelConfigRef.current,
-        },
-        []
-      );
-      setActiveFeature("video");
-    } else {
-      setActiveFeature(null);
-    }
-  }, [videoWorkerMessage]);
-
-
 return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
@@ -995,12 +903,8 @@ return (
         imgSrc={imgSrc}
         fileVideoRef={fileVideoRef}
         fileImageRef={fileImageRef}
-        handle_OpenVideo={handle_OpenVideo}
         handle_OpenImage={handle_OpenImage}
         handle_ToggleCamera={handle_ToggleCamera}
-        handle_AddModel={handle_AddModel}
-        handle_AddClassesFile={handle_AddClassesFile}
-        handle_CloseVideo={handle_CloseVideo}
         activeFeature={activeFeature}
         isiPhoneSe={isIPhoneSE}
       />
