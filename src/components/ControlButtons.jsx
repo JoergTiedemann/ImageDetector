@@ -4,11 +4,9 @@ const bEnableLoadButtons = false;
 
 const ControlButtons = memo(function ControlButtons({
   imgSrc,
-  fileVideoRef,
   fileImageRef,
   handle_OpenImage,
   handle_ToggleCamera,
-  isiPhoneSe,
   activeFeature,
 }) {
   // console.log("isiPhoneSe in ControlButtons:", isiPhoneSe);

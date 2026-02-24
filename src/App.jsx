@@ -83,7 +83,6 @@ useEffect(() => {
   const overlayRef = useRef(null);
   const cameraRef = useRef(null);
   const fileImageRef = useRef(null);
-  const fileVideoRef = useRef(null);
   const isCameraActiveRef = useRef(false);
   const firstCameraInitDone = useRef(false); // außerhalb von getCameras, z. B. im Component Body
   const loadingRef = useRef(false);
@@ -94,8 +93,7 @@ useEffect(() => {
   const [customModels, setCustomModels] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [imgSrc, setImgSrc] = useState(null);
-  const [videoSrc, setVideoSrc] = useState(null);
-
+  
   const [details, setDetails] = useState([]);
   const [activeFeature, setActiveFeature] = useState(null); // null, 'video', 'image', 'camera'
 
@@ -138,35 +136,6 @@ useEffect(() => {
     window.addEventListener("beforeunload", cleanup);
     return () => window.removeEventListener("beforeunload", cleanup);
   }, []);
-
-const videoWorkerMessage = useCallback((e) => {
-  setProcessingStatus((prev) => ({
-    ...prev,
-    statusMsg: e.data.statusMsg,
-  }));
-  console.log("Video Worker Message empfangen:", e.data.statusMsg);
-  if (e.data.processedVideo) {
-    const url = URL.createObjectURL(e.data.processedVideo);
-    setVideoSrc(url); // Setze das Video für die Anzeige
-    setActiveFeature("processedVideo"); // Neue Feature für verarbeitete Videos
-    // Optional: URL später freigeben, z.B. beim nächsten Video oder Unmount
-    // URL.revokeObjectURL(url); // Entferne dies, um das Video abzuspielen
-  }
-  if (e.data.abnormalTerminate) {
-    console.log("Videoworker abnormal beendet, lade Modell neu");
-      setActiveFeature(null);
-      // loadModel();
-  }
-}, []);
-
-useEffect(() => {
-  return () => {
-    if (videoSrc) {
-      URL.revokeObjectURL(videoSrc);
-    }
-  };
-}, [videoSrc]);
-
 
 
 const loadModel = useCallback(async () => {
@@ -893,7 +862,6 @@ return (
         imgRef={imgRef}
         overlayRef={overlayRef}
         imgSrc={imgSrc}
-        videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoadDummy}
         // onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
@@ -901,7 +869,6 @@ return (
       />      
       <ControlButtons
         imgSrc={imgSrc}
-        fileVideoRef={fileVideoRef}
         fileImageRef={fileImageRef}
         handle_OpenImage={handle_OpenImage}
         handle_ToggleCamera={handle_ToggleCamera}
