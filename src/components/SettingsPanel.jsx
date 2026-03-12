@@ -56,13 +56,6 @@ const SettingsPanel = memo(function SettingsPanel({
     }
   }, [cameras, cameraSelectorRef]);
 
-  // Initialisierung repeatFrameCount falls nicht gesetzt
-  useEffect(() => {
-    if (modelConfigRef.current && typeof modelConfigRef.current.repeatFrameCount === "undefined") {
-      modelConfigRef.current.repeatFrameCount = 10;
-    }
-  }, [modelConfigRef]);
-
   return (
     <div
       id="setting-container"
@@ -117,72 +110,64 @@ const SettingsPanel = memo(function SettingsPanel({
 
               <div className="flex flex-col">
                 <label className="text-gray-300 mb-1 text-sm font-medium">
-                  Objektauswahl:
+                  KI-Modell:
                 </label>
                 <select
                   name="model-selector"
                   ref={modelSelectorRef}
+                  defaultValue= {modelConfigRef.current.model}
                   onChange={(e) => {
-                      const selectedModel = e.target.value;
-                      modelConfigRef.current.model = selectedModel;
-
-                      // Klassen automatisch setzen
-                      // console.log("selectedModel:", selectedModel);
-                      const mappedClass = modelClassMap[selectedModel];
-                      // console.log("mappedClass:", mappedClass," modelClassMap:", modelClassMap);
-                      // console.log("berry9kclasses:", berry.berry9k);
-                      modelConfigRef.current.imgsz_type = "zeroPad";
-                      if (mappedClass === "default") {
-                        modelConfigRef.current.classes = defaultClasses;
-                        classFileSelectedRef.current.value = "default";
-                      } else if (mappedClass === "berry") {
-                        modelConfigRef.current.classes = { classes: [...berry.berry] };
-                        classFileSelectedRef.current.value = "berry";
-                      } else if (mappedClass === "berry9k") {
-                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
-                        classFileSelectedRef.current.value = "berry9k";
-                      } else if (mappedClass === "berry9k_320") {
-                        modelConfigRef.current.imgsz_type = "zeroPad320";
-                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
-                        classFileSelectedRef.current.value = "berry9k";
-                      } else if (mappedClass === "berry9k_288") {
-                        modelConfigRef.current.imgsz_type = "zeroPad288";
-                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
-                        classFileSelectedRef.current.value = "berry9k";
-                      } else if (mappedClass === "berry9k_256") {
-                        modelConfigRef.current.imgsz_type = "zeroPad256";
-                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
-                        classFileSelectedRef.current.value = "berry9k";
-                      } else if (mappedClass === "berry9k_ultratiny_320") {
-
-                        modelConfigRef.current.imgsz_type = "zeroPad320";
-                        modelConfigRef.current.classes = { classes: [...berry.berry9k] };
-                        classFileSelectedRef.current.value = "berry9k";
-                        // console.log("SizeType:",modelConfigRef.current.imgsz_type);
-                      }
-
-                      // Falls du auch Custom-Modelle mit eigenen Klassen hast:
-                      const customIndex = customModels.findIndex(m => m.url === selectedModel);
-                      if (customIndex !== -1 && customClasses[customIndex]) {
-                        modelConfigRef.current.classes = customClasses[customIndex].data;
-                        classFileSelectedRef.current.value = customIndex.toString();
-                      }
-
-                      console.log("Model gewechselt:", selectedModel);
-                      console.log("Neue Klassen:", modelConfigRef.current.classes);
-
-                      loadModel();
-                    }}
+                    const selectedModel = e.target.value;
+                    modelConfigRef.current.model = selectedModel;
+                    // Klassen automatisch setzen
+                    const mappedClass = modelClassMap[selectedModel];
+                    modelConfigRef.current.imgsz_type = "zeroPad";
+                    if (mappedClass === "default") {
+                      modelConfigRef.current.classes = defaultClasses;
+                      classFileSelectedRef.current.value = "default";
+                    } else if (mappedClass === "berry") {
+                      modelConfigRef.current.classes = { classes: [...berry.berry] };
+                      classFileSelectedRef.current.value = "berry";
+                    } else if (mappedClass === "berry9k") {
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                      classFileSelectedRef.current.value = "berry9k";
+                    } else if (mappedClass === "berry9k_320") {
+                      modelConfigRef.current.imgsz_type = "zeroPad320";
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                      classFileSelectedRef.current.value = "berry9k";
+                    } else if (mappedClass === "berry9k_288") {
+                      modelConfigRef.current.imgsz_type = "zeroPad288";
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                      classFileSelectedRef.current.value = "berry9k";
+                    } else if (mappedClass === "berry9k_256") {
+                      modelConfigRef.current.imgsz_type = "zeroPad256";
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                      classFileSelectedRef.current.value = "berry9k";
+                    } else if (mappedClass === "berry9k_ultratiny_320") {
+                      modelConfigRef.current.imgsz_type = "zeroPad320";
+                      modelConfigRef.current.classes = { classes: [...berry.berry9k] };
+                      classFileSelectedRef.current.value = "berry9k";
+                    }
+                    // Falls du auch Custom-Modelle mit eigenen Klassen hast:
+                    const customIndex = customModels.findIndex(m => m.url === selectedModel);
+                    if (customIndex !== -1 && customClasses[customIndex]) {
+                      modelConfigRef.current.classes = customClasses[customIndex].data;
+                      classFileSelectedRef.current.value = customIndex.toString();
+                    }
+                    console.log("Model gewechselt:", selectedModel);
+                    console.log("Neue Klassen:", modelConfigRef.current.classes);
+                    loadModel();
+                  }}
                   disabled={activeFeature !== null}
                   className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
                 >
-                  <option value="berry9k_Epoch100_320">Blaubeeren 320</option>
-                  <option value="berry9k_ultratiny_320">Blaubeeren minimalmodell</option>
-                  <option value="berry9k_Epoch100_288">Blaubeeren 288</option>
-                  <option value="berry9k_Epoch100_256">Blaubeeren 256</option>
-                  <option value="berry9k_Epoch100">Blaubeeren 640</option>
+                  <option value="berry9k_Epoch100_320">Blaubeeren 320px Bildgröße</option>
+                  <option value="berry9k_ultratiny_320">Blaubeeren Minimodell</option>
+                  <option value="berry9k_Epoch100_288">Blaubeeren 288px Bildgröße</option>
+                  <option value="berry9k_Epoch100_256">Blaubeeren 256px Bildgröße</option>
+                  <option value="berry9k_Epoch100">Blaubeeren 640px Bildgröße</option>
                   <option value="berry2k_100">Blaubeeren + Blüten</option>
-                  <option value="yolo11n">allgemeine Objekte (2.6M)</option>
+                  {/* <option value="yolo11n">allgemeine Objekte (2.6M)</option> */}
                   {/* <option value="yolo11s">YOLO11s (9.4M)</option>
                   <option value="yolo12n">YOLO12n (2.6M)</option> */}
                   {customModels.map((model, index) => (
@@ -259,24 +244,6 @@ const SettingsPanel = memo(function SettingsPanel({
                     ))
                   )}
                 </select>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-gray-300 mb-1 text-sm font-medium">
-                  Aufnahmen bis sichere Erkennung:
-                </label>
-                <input
-                  type="number"
-                  min={4}
-                  max={50}
-                  defaultValue={modelConfigRef.current.repeatFrameCount ?? 10}
-                  onChange={e => {
-                    const val = Math.max(4, Math.min(50, parseInt(e.target.value, 10) || 10));
-                    modelConfigRef.current.repeatFrameCount = val;
-                  }}
-                  disabled={activeFeature !== null}
-                  className="p-2 text-sm rounded-md bg-gray-700 text-white border border-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 transition-all"
-                />
               </div>
 
               {/* <div className="flex flex-col">

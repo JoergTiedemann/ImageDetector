@@ -2,10 +2,8 @@ import "./assets/App.css";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { model_loader,model_loadernew,load_modelEmbedding,detectBackend,isIPhoneSEDevice } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
-import { render_overlay,render_overlaytracked } from "./utils/render_overlay";
-import { computeBerryEmbedding } from "./tracking/BerryReID";
-import { Berries,countBerryArrayByClass} from "./tracking/BerryMatcher";
-import { berryReIdManager,countBerriesByClass,countBerriesConfirmed } from "./tracking/berryReIdManager"; 
+import { render_overlay} from "./utils/render_overlay";
+import { countBerryArrayByClass} from "./tracking/BerryMatcher";
 
 
 import classes from "./utils/yolo_classes.json";
@@ -15,6 +13,15 @@ const appVersion = packageJson.version;
 const isIPhoneSE = isIPhoneSEDevice();
 let inputCanvas = null;
 let ctx = null;
+
+// Globales Objekt für die maximale Anzahl an Boundingboxes pro Frame
+let MaxValues = {
+  MaxBerryCount: 0,
+  ReifBerryCount: 0,
+  UnReifBerryCount: 0,
+  HalbReifBerryCount: 0,
+};
+
 
 // Components
 import SettingsPanel from "./components/SettingsPanel";
@@ -29,11 +36,10 @@ const MODEL_CONFIG = {
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "auto",
-  model: "berry9k_Epoch100_320",
+  model: "berry9k_ultratiny_320",//"berry9k_Epoch100_320",
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad320", // "dynamic", "zeroPad" oder "zeroPad320"
-  repeatFrameCount: 10,   // Anzahl Frames, die eine Beere mindestens erkannt werden muss, um als "confirmed" zu gelten
   classes: { classes: [...berry.berry9k] },
 };
 
@@ -61,6 +67,7 @@ useEffect(() => {
       console.log("Eruda Debug-Konsole aktiviert (iPhone Safari)");
     };
     document.body.appendChild(script);
+
   }
 }, []);
 
@@ -74,7 +81,6 @@ useEffect(() => {
   const cameraSelectorRef = useRef(null);
   const imgszTypeSelectorRef = useRef(null);
   const sessionRef = useRef(null);
-  const modelCache = useRef({});
   const [multiImageUrls, setMultiImageUrls] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -83,7 +89,6 @@ useEffect(() => {
   const overlayRef = useRef(null);
   const cameraRef = useRef(null);
   const fileImageRef = useRef(null);
-  const fileVideoRef = useRef(null);
   const isCameraActiveRef = useRef(false);
   const firstCameraInitDone = useRef(false); // außerhalb von getCameras, z. B. im Component Body
   const loadingRef = useRef(false);
@@ -94,8 +99,7 @@ useEffect(() => {
   const [customModels, setCustomModels] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [imgSrc, setImgSrc] = useState(null);
-  const [videoSrc, setVideoSrc] = useState(null);
-
+  
   const [details, setDetails] = useState([]);
   const [activeFeature, setActiveFeature] = useState(null); // null, 'video', 'image', 'camera'
 
@@ -104,21 +108,10 @@ useEffect(() => {
   const classFileSelectedRef = useRef(null);
   // const [currentClasses, setCurrentClasses] = useState(classes);
 
-  // Worker
-  const videoWorkerRef = useRef(null);
-
-  // Tracking
-  const berriesRef = useRef(new Berries());
-  const frameIndexRef = useRef(0);
 
 // Init page
   useEffect(() => {
     loadModel();
-
-    // getCameras();
-
-    // videoWorker.onmessage = videoWorkerMessage;
-    // videoWorkerRef.current = videoWorker;
   }, []);
 
   // Zusätzlich: beim Verlassen der Seite Session freigeben
@@ -133,40 +126,10 @@ useEffect(() => {
           console.warn("Fehler beim Freigeben beim Unload:", err);
         }
       }
-      modelCache.current = {};
     };
     window.addEventListener("beforeunload", cleanup);
     return () => window.removeEventListener("beforeunload", cleanup);
   }, []);
-
-const videoWorkerMessage = useCallback((e) => {
-  setProcessingStatus((prev) => ({
-    ...prev,
-    statusMsg: e.data.statusMsg,
-  }));
-  console.log("Video Worker Message empfangen:", e.data.statusMsg);
-  if (e.data.processedVideo) {
-    const url = URL.createObjectURL(e.data.processedVideo);
-    setVideoSrc(url); // Setze das Video für die Anzeige
-    setActiveFeature("processedVideo"); // Neue Feature für verarbeitete Videos
-    // Optional: URL später freigeben, z.B. beim nächsten Video oder Unmount
-    // URL.revokeObjectURL(url); // Entferne dies, um das Video abzuspielen
-  }
-  if (e.data.abnormalTerminate) {
-    console.log("Videoworker abnormal beendet, lade Modell neu");
-      setActiveFeature(null);
-      // loadModel();
-  }
-}, []);
-
-useEffect(() => {
-  return () => {
-    if (videoSrc) {
-      URL.revokeObjectURL(videoSrc);
-    }
-  };
-}, [videoSrc]);
-
 
 
 const loadModel = useCallback(async () => {
@@ -199,7 +162,6 @@ const loadModel = useCallback(async () => {
       }
       embeddingSessionRef.current = null;
     }
-    modelCache.current = {};
 
     setProcessingStatus(prev => ({
       ...prev,
@@ -250,9 +212,6 @@ const loadModel = useCallback(async () => {
     const end = performance.now();
 
     sessionRef.current = yolo_model;
-    // Chache wollen wir nicht
-    // const cacheKey = `${modelConfig.model}-${modelConfig.task}-${backend}`;
-    // modelCache.current[cacheKey] = yolo_model;
 
     // Embedding-Modell laden
     try {
@@ -284,68 +243,6 @@ const loadModel = useCallback(async () => {
   }
 }, [customModels]);
 
-
-  // Button add model
-  const handle_AddModel = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const fileName = file.name.replace(".onnx", "");
-      const fileUrl = URL.createObjectURL(file);
-      setCustomModels((prevModels) => [
-        ...prevModels,
-        { name: fileName, url: fileUrl },
-      ]);
-    }
-  }, []);
-
-  // Button add classes file
-  const handle_AddClassesFile = useCallback((event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const jsonData = JSON.parse(e.target.result);
-
-        const fileName = file.name.replace(/\.json$/i, "");
-        setCustomClasses((prev) => [
-          ...prev,
-          { name: fileName, data: jsonData },
-        ]);
-
-        setProcessingStatus((prev) => ({
-          ...prev,
-          statusMsg: `Classes file "${fileName}" loaded successfully`,
-          statusColor: "green",
-        }));
-      } catch (error) {
-        console.error("Error parsing JSON file:", error);
-        setProcessingStatus((prev) => ({
-          ...prev,
-          statusMsg: error.message || "Error parsing JSON file",
-          statusColor: "red",
-        }));
-      }
-    };
-
-    reader.onerror = () => {
-      setProcessingStatus((prev) => ({
-        ...prev,
-        statusMsg: "Failed to read file",
-        statusColor: "red",
-      }));
-    };
-
-    reader.readAsText(file);
-  }, []);
-
-  // Button Close Video
-  const handle_CloseVideo = useCallback(() => {
-    setVideoSrc(null);
-    setActiveFeature(null);
-    loadModel();
-  }, []);
 
   // Button Upload Image
   // Mehrfachauswahl: mehrere Bilder nacheinander laden und erkennen
@@ -543,104 +440,6 @@ const loadModel = useCallback(async () => {
     }
   }, []);
 
-// ================= Hilfsfunktionen =================
-
-function iou(boxA, boxB) {
-  const [ax, ay, aw, ah] = boxA;
-  const [bx, by, bw, bh] = boxB;
-
-  const x1 = Math.max(ax, bx);
-  const y1 = Math.max(ay, by);
-  const x2 = Math.min(ax + aw, bx + bw);
-  const y2 = Math.min(ay + ah, by + bh);
-
-  const interW = Math.max(0, x2 - x1);
-  const interH = Math.max(0, y2 - y1);
-  const inter = interW * interH;
-  if (inter === 0) return 0;
-
-  const areaA = aw * ah;
-  const areaB = bw * bh;
-  return inter / (areaA + areaB - inter);
-}
-
-function mergeOverlappingDetections(dets, iouThresh = 0.6) {
-  const kept = [];
-  for (const det of dets) {
-    let merged = false;
-    for (const k of kept) {
-      if (det.class_idx !== k.class_idx) continue;
-      if (iou(det.bbox, k.bbox) > iouThresh) {
-        // nimm die mit höherem Score
-        if (det.score > k.score) {
-          k.bbox = det.bbox;
-          k.score = det.score;
-        }
-        merged = true;
-        break;
-      }
-    }
-    if (!merged) kept.push({ ...det });
-  }
-  return kept;
-}
-
-function computeColorHistogram(ctx, det, bins = 32) {
-  let [x, y, w, h] = det.bbox;
-
-  // Pixel-Koordinaten runden
-  x = Math.floor(x);
-  y = Math.floor(y);
-  w = Math.floor(w);
-  h = Math.floor(h);
-
-  if (w < 2 || h < 2) {
-    return new Array(bins).fill(1 / bins);
-  }
-
-  const imgData = ctx.getImageData(x, y, w, h);
-  const data = imgData.data;
-  const hist = new Array(bins).fill(0);
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] / 255;
-    const g = data[i + 1] / 255;
-    const b = data[i + 2] / 255;
-
-    // komplett schwarze Pixel überspringen (vermeidet Hue-NaN)
-    if (r === 0 && g === 0 && b === 0) continue;
-
-    const hue = rgbToHue(r, g, b); // Wert in [0,1] erwartet
-    if (Number.isNaN(hue)) continue;
-
-    let bin = Math.floor(hue * bins);
-    if (bin < 0) bin = 0;
-    if (bin >= bins) bin = bins - 1;
-
-    hist[bin] += 1;
-  }
-
-  const sum = hist.reduce((a, b) => a + b, 0);
-
-  // WICHTIG: sum==0 absichern → sonst NaN
-  if (sum === 0) {
-    return new Array(bins).fill(1 / bins);
-  }
-
-  return hist.map(v => v / sum);
-}
-
-function rgbToHue(r, g, b) {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-
-  if (d === 0) return 0;
-  if (max === r) return ((g - b) / d) % 6;
-  if (max === g) return (b - r) / d + 2;
-  return (r - g) / d + 4;
-}
-
 
   // Button toggle camera
   const handle_ToggleCamera = useCallback(async () => {
@@ -652,23 +451,23 @@ function rgbToHue(r, g, b) {
       overlayRef.current.height = 0;
       isCameraActiveRef.current = false;
 
-      // const result = countBerriesByClass(berryReIdManager);
       // console.log("Endergebnis:", result);
       // Ausgabe: { unreif: X, mittelreif: Y, reif: Z }
-      setDetails({
-        bildanalyse: 0,
-        // frameDetections: tracked,
-        // uniqueBerryCount: berries.items.length,
-        globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
-      });
+      // setDetails({
+      //   bildanalyse: 0,
+      //   // frameDetections: tracked,
+      //   // uniqueBerryCount: berries.items.length,
+      //   globalBerryInfo: countBerriesByClass(berryReIdManager)   // <- neu
+      // });
       // setDetails([]);
       setActiveFeature(null);
     } else {
+      // MaxValues initialisieren
+      MaxValues.MaxBerryCount = 0;
+      MaxValues.ReifBerryCount = 0;
+      MaxValues.UnReifBerryCount = 0;
+      MaxValues.HalbReifBerryCount = 0;
       // open camera
-      //erstmal alle bisherigen getrackten Beeren löschen
-      berryReIdManager.reset();
-      // berriesRef.current.items = [];
-      // berriesRef.current.nextId = 1;
       isCameraActiveRef.current = true;
       try {
         setProcessingStatus((prev) => ({
@@ -817,82 +616,52 @@ function rgbToHue(r, g, b) {
         overlayCtx.canvas.height
       );
 
-      // -------- Re-ID Tracking --------
-      frameIndexRef.current += 1;
-      const frameIndex = frameIndexRef.current;
       const tracked = [];
 
-      // 1. YOLO-Filter
-      // kleine Boxen (w oder h < 20px) und schwache Scores (score < 0.5) werden gefiltert
-      let filtered = results.bbox_results.filter(det => {
-        if (det.score < 0.5) return false;
-        const [x, y, w, h] = det.bbox;
-        if (w < 20 || h < 20) return false;
-        return true;
-      });
+      // Overlay
+      render_overlay(results, overlayCtx, modelConfigRef.current.classes);
 
-      // 2. Merge
-      // bounding boxes, die sich stark überlappen (IoU > 0.6) und zur selben Klasse gehören, werden gemerged (nämlich die mit dem höheren Score behalten)
-      filtered = mergeOverlappingDetections(filtered);
-
-      // 3. Re-ID Matching
-      if (embeddingSessionRef.current && embeddingSessionRef.current.session) {
-        for (const det of filtered) {
-          // --- Embedding extrahieren ---
-          const embedding = await computeBerryEmbedding(
-            ctx,
-            det,
-            embeddingSessionRef.current.session
-          );
-          // 🔍 HIER: Raw YOLO Bounding Box loggen
-          // console.log("Raw bbox:", det.bbox);
-
-
-          // --- Color Histogram extrahieren -
-          const colorHist = computeColorHistogram(ctx, det);
-
-          // --- Größe extrahieren ---
-          const [x, y, w, h] = det.bbox;
-          const size = w * h;
-
-          // ------------------------------
-          // 🔍 DEBUG LOGS HIER EINBAUEN
-          // ------------------------------
-          // console.log("---- DEBUG FRAME", frameIndex, "----");
-          // console.log("Embedding length:", embedding.length);
-          // console.log("Embedding sample:", embedding.slice(0, 5));
-          // console.log("ColorHist sample:", colorHist.slice(0, 5));
-          // console.log("Size:", size);
-
-
-          const match = berryReIdManager.processDetection(
-            { embedding, colorHist, size, class_idx: det.class_idx },
-            frameIndex,
-             modelConfigRef.current.repeatFrameCount // <-- hier übergeben
-          );
-
+        let id = 0;
+      for (const det of results.bbox_results) {
+          id++;
           tracked.push({
             ...det,
-            id: match.id,
-            confirmed: match.confirmed,
-            similarity: match.score,
-            isNew: match.isNew,
-            imageWidth: ctx.canvas.width,
-            imageHeight: ctx.canvas.height
+            id,
+            imageWidth: overlayCtx.canvas.width,
+            imageHeight: overlayCtx.canvas.height
           });
+
+        const detg = {
+          globalBerryInfo: countBerryArrayByClass(results.bbox_results)
+        };
+
+        // nun die Maxwerte aktualisieren, wenn die aktuelle Anzahl an Boundingboxes größer ist
+        // console.log(`Aktuelle Berry-Anzahl: ${results.bbox_results.length}, MaxBerryCount bisher: ${MaxValues.MaxBerryCount}`);
+        if (results.bbox_results.length >  MaxValues.MaxBerryCount) {
+          MaxValues.MaxBerryCount = results.bbox_results.length;
+          let allGlobalBerryInfo = {};
+
+          if (detg.globalBerryInfo && detg.globalBerryInfo.classMap) {
+            const classMap = detg.globalBerryInfo.classMap;
+            // Map-Objekt
+            for (const [key, value] of classMap.entries()) {
+              // console.log(`Kumulieren Klasse (Map) ${key}:`, value);
+              allGlobalBerryInfo[key] = (allGlobalBerryInfo[key] || 0) + value;
+            }
+            MaxValues.ReifBerryCount= (allGlobalBerryInfo[0] || 0);
+            MaxValues.UnReifBerryCount=(allGlobalBerryInfo[2] || 0);
+            MaxValues.HalbReifBerryCount=(allGlobalBerryInfo[1] || 0);
+            console.log(`Max Berries:${MaxValues.MaxBerryCount} Reif:`, MaxValues.ReifBerryCount, "Unreif:", MaxValues.UnReifBerryCount, "HalbReif:", MaxValues.HalbReifBerryCount);
+            const detObj = {
+              bildanalyse: 0,
+              uniqueBerryCount: MaxValues.MaxBerryCount,
+              reifCount: MaxValues.ReifBerryCount,
+              unreifCount: MaxValues.UnReifBerryCount,
+              halbReifCount: MaxValues.HalbReifBerryCount,
+            };
+            setDetails(detObj);
+          }
         }
-      }
-
-      // Overlay
-      if (isCameraActiveRef.current) {
-        render_overlaytracked(tracked, overlayCtx, modelConfigRef.current.classes);
-
-        setDetails({
-          bildanalyse: 0,
-          frameDetections: tracked,
-          // uniqueBerryCount: berryReIdManager.archive.length
-          uniqueBerryCount: countBerriesConfirmed(berryReIdManager).total
-        });
       }
 
       setProcessingStatus(prev => ({
@@ -905,37 +674,7 @@ function rgbToHue(r, g, b) {
     requestAnimationFrame(handle_frame_continuous);
   }, [sessionRef.current]);
 
-  // Button Upload Video
-  const handle_OpenVideo = useCallback( async (file) => {
-    if (file) {
   
-      // Worker ggf. neu starten -> vorher beenden
-      if (videoWorkerRef.current) {
-        console.log("Beende alten Video Worker");
-        videoWorkerRef.current.postMessage({ type: "cleanup" });
-        // videoWorkerRef.current.terminate();
-      }
-      const videoWorker = new Worker(
-        new URL("./utils/video_process_worker.js", import.meta.url),
-        { type: "module" }
-      );
-      videoWorker.onmessage = videoWorkerMessage;
-      videoWorkerRef.current = videoWorker;
-      console.log("Starte Video Worker aus main thread");
-      videoWorkerRef.current.postMessage(
-        {
-          file: file,
-          modelConfig: modelConfigRef.current,
-        },
-        []
-      );
-      setActiveFeature("video");
-    } else {
-      setActiveFeature(null);
-    }
-  }, [videoWorkerMessage]);
-
-
 return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 bg-gray-900 min-h-screen">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-6 text-white">
@@ -985,7 +724,6 @@ return (
         imgRef={imgRef}
         overlayRef={overlayRef}
         imgSrc={imgSrc}
-        videoSrc={videoSrc} // Neu hinzufügen
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoadDummy}
         // onVideoEnd={() => setActiveFeature(null)} // Neu: Setze activeFeature zurück
@@ -993,14 +731,9 @@ return (
       />      
       <ControlButtons
         imgSrc={imgSrc}
-        fileVideoRef={fileVideoRef}
         fileImageRef={fileImageRef}
-        handle_OpenVideo={handle_OpenVideo}
         handle_OpenImage={handle_OpenImage}
         handle_ToggleCamera={handle_ToggleCamera}
-        handle_AddModel={handle_AddModel}
-        handle_AddClassesFile={handle_AddClassesFile}
-        handle_CloseVideo={handle_CloseVideo}
         activeFeature={activeFeature}
         isiPhoneSe={isIPhoneSE}
       />

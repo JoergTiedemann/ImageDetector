@@ -14,11 +14,11 @@ Zu trainieren folgenden Befehl verwenden
 yolo detect train data=c:\Users\joerg\Documents\Git\ImageDetector\home\data.yaml model=yolov8n.pt epochs=50 imgsz=640 batch=8
 ```
 Die Anzahl der Epochen bestimmt die Genauigkeit des Modells epochs=50 ist das absolute Minimum, 100 sind in jedem Fall besser. Die Batchgröße bestimmt wieviel Images bei einer Iteration verwendet werden, 8 hat sich als guter Wert erwiesen, 12 gehen auch noch unterhalb von 8 sollte man nicht gehen.
-Die Imagesize sollte bei 640 gelassen werden 
-Man kann auch auf google Colab trainieren, da stehen leistungsfähige Rechner zur Verfügiung aber nur eingeschränkte Rechenzeit von ca. 1-2Stunden pro Tag
+Die Imagesize sollte bei 640px gelassen werden, 320px verbraucht aber wesentlich weniger Speicher   
+Man kann auch auf google Colab trainieren, da stehen leistungsfähige Rechner zur Verfügiung aber nur eingeschränkte Rechenzeit von ca. 1-2Stunden pro Tag  
 Ein entsprechend konfiguriertes Colab Notbook befindet sich im Ordner Colab
 ### Anmerkungen
-Man kann das Training unterbrechen mit Ctrl-C
+Man kann das Training auch unterbrechen 
 - Ctrl + C ist völlig sicher.
 - man verliert keine Epochen.
 - best.pt und last.pt werden immer gespeichert.
@@ -31,16 +31,15 @@ Wenn man z. B. nach 30 Epochen abbricht:
 Beide sind voll exportierbar.
 
 Man kann weitertrainieren mit
-```
 ACHTUNG Pfad beachten
-yolo train resume=TRUE model=runs/detect/train/weights/last.pt 
-Die Parameter data=data.yaml epochs=50 brauchen nicht mit angegeben werden können es aber wenn neue Werte verwendet werden sollen (z.B. anderen Epochs oder oder batch)
-
 ```
+yolo train resume=TRUE model=runs/detect/train/weights/last.pt 
+```
+Die Parameter data=data.yaml epochs=50 brauchen nicht mit angegeben werden, können es aber wenn neue Werte verwendet werden sollen (z.B. anderen Epochs oder oder batch)
 
-### Ultratiny Modell on the scratch erzeugen
+### Ultratiny Modell von Beginn an erzeugen
 man braucht die fastestiny.yaml Datei  
-und man braucht eine Installationsumgebung und Ultraalytics 8.0.73 
+und man braucht eine Installationsumgebung und Ultraalytics 8.0.73   
 Das ist offensichtlich die letzte Version die custom yaml Dateien zu Architekturdefinition noch akzeptiert
 (Das muss aber nochmal getestet werden)
 ``` 
@@ -68,7 +67,8 @@ yolo train model=./fastestiny.yaml data=./datasets/data.yaml imgsz=320 epochs=50
 
 ``` 
 Die yaml muss im Ordner
-c:\Temp\Training\9k_100Epoch\venv\Lib\site-packages\ultralytics\models\v8\ liegen, sonst wird eine Standard Yaml genommen und keine Fehlermeldung erzeugt !!!
+c:\Temp\Training\9k_100Epoch\venv\Lib\site-packages\ultralytics\models\v8\ liegen,  
+sonst wird eine Standard Yaml genommen und keine Fehlermeldung erzeugt !!!
 
 
 Dann der Export nach onnx
@@ -90,7 +90,7 @@ und dann
 python -m onnx_tool -i best.onnx
 ``` 
 Man bekommt eine Tabelle die Forward_MACs und Params  enthaält und am Ende eine Summierung 
-Forward_MACs*2 / 1.000.000.000 gibt die GFLOPS Anzahl die zusammen mit Params entwas über die schwere/Komplexität des Models aussagt 
+Forward_MACs*2 / 1.000.000.000 gibt die GFLOPS Anzahl die zusammen mit Params etwas über die Schwere/Komplexität des Models aussagt 
 
 ### Exportieren
 nach dem Training wird ein Export in das onnx Format benötigt damit die onnxruntime-web engine das Model laden und verarbeiten kann.  
@@ -99,20 +99,20 @@ Hier folgenden Befehl verwenden:
 yolo export model=runs/detect/train/weights/best.pt format=onnx opset=12 simplify=False dynamic=True imgsz=640
 ```
 Wenn dort eine andere Imagesize angegeben wird kann man das Modell verschlanken so das es weniger Speicher verbraucht
-Was  durchaus Sinn macht: 320 bringen enorm was, 288 oder 256 bringen auch was aber der Leistungsunterschied ist nicht so gross aber die Fehlerrate steigt
+Was  durchaus Sinn macht:  
+320px bringen enorm was, 288px oder 256px bringen auch was aber der Leistungsunterschied ist nicht so gross aber die Fehlerrate steigt
 
 ## Weitere Ideen nach Obstbau-Messe York
 ### Erkenntnisse
-alle die in Richtung Ernteerkennung was machen benutzen Yolov8n und fast alle das vordefinierte COCO Modell das mit eigenen Daten verfeinert wurde
-Re-Id haben alle als sehr rechen- und speicherintensiv bezeichnet und davon Abstand genommen, die Einzigen die es hinbekommen haben ist die Uni Harburg in Zusammenarbeit mit dem Fraunhofer Institut und dort haben Sie mittels Lidar oder Stereokamera und 4cm GPS Daten jedem Pixel eine 3D GPS Koordinate gegeben
+Alle die in Richtung Ernteerkennung was machen benutzen Yolov8n und fast alle das vordefinierte COCO Modell das mit eigenen Daten verfeinert wurde  
+Re-Id haben alle als sehr rechen- und speicherintensiv bezeichnet und davon Abstand genommen, die Einzigen die es hinbekommen haben ist die Uni Harburg in Zusammenarbeit mit dem Fraunhofer Institut und dort haben Sie mittels Lidar oder Stereokamera und 4cm GPS Daten jedem Pixel eine 3D GPS Koordinate gegeben  
 Am Ende ist Re-ID der Overkill und endet in einer Hardwareschlacht.
-Die Österreicher haben es da sehr einfach gemacht und aus den mit GoPro aufgenommenen Frames einfach das genommen was am meisten Früchte hatte und das haben sie dann hochgerechnet mittels empirisch ermittelten Schätzwerten, ähnlich hat es auch die Uni in Michigan gemacht in dem sie jedenStrauch angeflogen haben und nur 1 Foto pro Strauch gemacht haben.
+Die Österreicher haben es da sehr einfach gemacht und aus den mit GoPro aufgenommenen Frames einfach das genommen was am meisten Früchte hatte und das haben sie dann hochgerechnet mittels empirisch ermittelten Schätzwerten, ähnlich hat es auch die Uni in Michigan gemacht hat, in dem sie jeden Strauch angeflogen haben und nur 1 Foto pro Strauch gemacht haben.
 Die Österreicher sind dann auf Genauigkeiten > 85% gekommen
 
-### wie machen wir weiter
-
-Für Ernteprognose d.h. wieviel Prozent sind reif mittelreif und unreif ist die absolute Menge auch vollkommen irrelevant
-Für die Mengenprognose kann auch ein Bild oder der Frame mit den meisten Früchten aufgenommen werden und dann hochgerechnet werden, Ideal wäre es wenn verschiedene Szenen/Aufnahmeblickwinkel erkannt würden und dann daraus die Summe gebildet wird und hochgerechnet wird aber vermutlich ist das gar nicht notwendig
+### Was habe ich implementiert
+Für Ernteprognose d.h. wieviel Prozent sind reif, mittelreif und unreif ist die absolute Menge vollkommen irrelevant  
+Für die Mengenprognose kann auch ein Bild oder der Frame mit den meisten Früchten aufgenommen werden und dann hochgerechnet werden, Ideal wäre es wenn verschiedene Szenen/Aufnahmeblickwinkel erkannt würden und dann daraus die Summe gebildet wird und hochgerechnet wird aber vermutlich ist das gar nicht notwendig  
 Gleiches gilt für die Blütenerkennung nur das man hier vermutlich andere Faktoren braucht
 
 Am Ende wollen wir 3 Dinge machen
@@ -120,12 +120,15 @@ Am Ende wollen wir 3 Dinge machen
 * kurzfristige Mengenprognose der Beeren
 * mittelfristige erwartete Ernte über Blüten
 
-Dafür brauchen wir vermutlich 3 Schätzfaktoren und die Frage ist ob wir das aus den Framestream machen oder aus Bildern 
-Beides müsste zum Ziel führen hat aber vermutlich unteschiedliche Genauigkeiten
-Die Frage ist ob wir beides implementieren
-Der Ansatz : Nimm die Frames und von denen die mit der größten Stückzahl und dann Faktor (mindesten 2) ist gut 
-die Alternative Nimm 4 oder 8 Fotos des Strauchs und zähle und dann Faktor ist auch gut, die Frage ist was genauer ist und was wann gemacht werden soll
-Re-Id können wir auf jeden Fall wieder ausbauen 
+Dafür brauchen wir vermutlich 3 Schätzfaktoren.
+Die Reifeprognose wird aus dem Kamerastream gemacht und dabei wird das Frame genommen auf dem die meisten Beeren erkannt wurden und dann wird der Reifegrad ausgeben und fertigt.  
+Für die Ernteprognose können eine beliebige Anzahl an Fotos pro Strauch ausgewält werden, diese werden dann analysiert und die Summe gebildet.
+Beide Ergebnisse muss mann dann wohl noch mit einem Faktor korrigieren aber das muss der Prototypentest am realen Strauch bringen 
+
+Es wurde also folgender Ansatz gewählt:  
+- Nimm die Frames und von denen die mit der größten Stückzahl und mach daraus eine Reifegradprognose (und dann später mit Faktor korrigieren)
+- Nimm 4 oder 8 Fotos des Strauchs und zähle die reifen, nunreifen und mittelreifen Beeren 
+- Re-Id können wurde wieder ausgebaut weil es nicht zum Ziel führte 
 
 ### Erkenntnisse beim Test der verschiedenen Modelle und weiteres ToDo
 es wurden jeweils die ersten 17 Bilder des 9K Trainingsmodells getestet auf Notebook 
@@ -144,7 +147,8 @@ das müssen wir noch näher untersuchen
 
 
 
-# Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild
+# Grundprinzip der Erkennung und Vermeidung von Doppelzählungen bei dauerhaftem Kamerabild 
+**wurde in Version 1.x implementiert und inzwischen wieder ausgebaut**   
 Man braucht kein Tracking, sondern globale Wiedererkennung.  
 Jede Beere wird zu einem Cluster, der über die Zeit wächst.
 Neue Beobachtungen werden gegen diese Cluster gemachted.  

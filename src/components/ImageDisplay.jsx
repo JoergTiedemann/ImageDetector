@@ -5,10 +5,8 @@ const ImageDisplay = memo(function ImageDisplay({
   imgRef,
   overlayRef,
   imgSrc,
-  videoSrc, // Neu: Prop für verarbeitete Videos
   onCameraLoad,
   onImageLoad,
-  onVideoEnd, // Neu: Callback für Video-Ende
   activeFeature,
 }) {
   return (
@@ -35,9 +33,9 @@ const ImageDisplay = memo(function ImageDisplay({
               d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          <p className="text-base sm:text-xl font-medium">kein Bild oder Video ausgewählt</p>
+          <p className="text-base sm:text-xl font-medium">kein Bild oder Kamera ausgewählt</p>
           <p className="mt-1 sm:mt-2 text-xs sm:text-base">
-            Bitte Kamera, Video oder Bild öffnen
+            Bitte Kamera oder Bild öffnen
           </p>
         </div>
       )}
@@ -57,16 +55,6 @@ const ImageDisplay = memo(function ImageDisplay({
         hidden={activeFeature !== "image"}
         className="block max-h-[400px] sm:max-h-[640px] rounded-lg mx-auto object-contain"
         alt="Uploaded"
-      />
-      {/* Neu: Video für verarbeitete Videos */}
-      <video
-        src={videoSrc}
-        hidden={activeFeature !== "processedVideo"}
-        className="block max-h-[400px] sm:max-h-[640px] rounded-lg mx-auto object-contain"
-        controls // Füge Controls hinzu, um Play/Pause zu erlauben
-        autoPlay // Automatisch abspielen
-        onLoadedMetadata={() => console.log("Processed video loaded")}
-        onEnded={onVideoEnd} // Neu: Setze activeFeature zurück, wenn Video endet
       />
       <canvas
         ref={overlayRef}
