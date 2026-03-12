@@ -33,9 +33,9 @@ const ImageDisplay = memo(function ImageDisplay({
               d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          <p className="text-base sm:text-xl font-medium">kein Bild oder Video ausgewählt</p>
+          <p className="text-base sm:text-xl font-medium">kein Bild oder Kamera ausgewählt</p>
           <p className="mt-1 sm:mt-2 text-xs sm:text-base">
-            Bitte Kamera, Video oder Bild öffnen
+            Bitte Kamera oder Bild öffnen
           </p>
         </div>
       )}

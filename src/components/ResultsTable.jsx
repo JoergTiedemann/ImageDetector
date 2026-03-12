@@ -37,7 +37,7 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses,curren
       reif_percent = global_sum > 0 ? Math.round((global_reif / global_sum) * 100) : 0;
     }
   }
-  /* als erstes due Summentitelzeile  */
+  /* als erstes die Summentitelzeile  */
   return (
     <div className="container bg-gray-800 rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
       <details className="text-gray-200 group">
@@ -109,36 +109,54 @@ const ResultsTable = memo(function ResultsTable({ details, currentClasses,curren
           {/* Globale Beerenliste */}
           {bildanalyse > 0 && (
             <>
-              <h3 className="text-gray-300 font-semibold mb-2">Globale Beerenliste</h3>
+              <h3 className="text-gray-300 font-semibold mb-2">Bildanalyse</h3>
                 <div className="overflow-x-auto -mx-3 px-3">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
                         <tr className="bg-gray-700 text-center">
-                          <th className="p-2 text-xs sm:text-sm">ID</th>
-                          <th className="p-2 text-xs sm:text-sm">Typ</th>
-                          <th className="p-2 text-xs sm:text-sm">Wahrscheinlichkeit</th>
+                          <th className="p-2 text-xs sm:text-sm">Bild</th>
+                          <th className="p-2 text-xs sm:text-sm">Reifegrad</th>
+                          <th className="p-2 text-xs sm:text-sm">Anzahl</th>
                         </tr>
                     </thead>
                     <tbody>
-                      {detections.map((item, index) => (
-                        <tr
-                          key={index}
-                          className={
-                            "border-b border-gray-700 transition-colors text-center " +
-                            (item.imageIndex === (currentImageIndex + 1)
-                              ? "text-green-300 hover:text-green-200"
-                              : "text-gray-300 hover:bg-gray-700")
-                          }
-                        >
-                          <td className="p-2 font-mono text-xs sm:text-sm">{item.imageIndex ?? 0}/{item.id ?? -99}</td>
-                          <td className="p-2 text-xs sm:text-sm">
-                            {currentClasses[item.class_idx] || `Class ${item.class_idx}`}
-                          </td>
-                          <td className="p-2 text-xs sm:text-sm">
-                            {(item.score * 100).toFixed(1)}%
-                          </td>
-                        </tr>
-                      ))}
+                      {/* Neue Ansicht: Stückzahlen pro class_idx und imageIndex */}
+                      {(() => {
+                        // Gruppiere detections nach imageIndex und class_idx
+                        const grouped = {};
+                        const totals = {};
+                        detections.forEach((item) => {
+                          const imgIdx = item.imageIndex ?? 0;
+                          const clsIdx = item.class_idx ?? -1;
+                          if (!grouped[imgIdx]) grouped[imgIdx] = {};
+                          if (!grouped[imgIdx][clsIdx]) grouped[imgIdx][clsIdx] = 0;
+                          grouped[imgIdx][clsIdx] += 1;
+                          if (!totals[imgIdx]) totals[imgIdx] = 0;
+                          totals[imgIdx] += 1;
+                        });
+                        // Erzeuge Zeilen: für jeden imageIndex und class_idx
+                        return Object.entries(grouped).map(([imgIdx, classCounts]) => (
+                          Object.entries(classCounts).map(([clsIdx, count]) => {
+                            const total = totals[imgIdx] || 1;
+                            const percent = ((count / total) * 100).toFixed(0);
+                            return (
+                              <tr
+                                key={imgIdx + '-' + clsIdx}
+                                className={
+                                  "border-b border-gray-700 transition-colors text-center " +
+                                  (parseInt(imgIdx) === (currentImageIndex + 1)
+                                    ? "text-green-300 hover:text-green-200"
+                                    : "text-gray-300 hover:bg-gray-700")
+                                }
+                              >
+                                <td className="p-2 font-mono text-xs sm:text-sm">{imgIdx}</td>
+                                <td className="p-2 text-xs sm:text-sm">{currentClasses[clsIdx] || `Class ${clsIdx}`}</td>
+                                <td className="p-2 text-xs sm:text-sm">{count} / {percent}%</td>
+                              </tr>
+                            );
+                          })
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 </div>

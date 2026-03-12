@@ -36,11 +36,10 @@ const MODEL_CONFIG = {
   iou_threshold: 0.35,
   score_threshold: 0.45,
   backend: "auto",
-  model: "berry9k_Epoch100_320",
+  model: "berry9k_ultratiny_320",//"berry9k_Epoch100_320",
   model_path: "",
   task: "detect",
   imgsz_type: "zeroPad320", // "dynamic", "zeroPad" oder "zeroPad320"
-  repeatFrameCount: 10,   // Anzahl Frames, die eine Beere mindestens erkannt werden muss, um als "confirmed" zu gelten
   classes: { classes: [...berry.berry9k] },
 };
 
